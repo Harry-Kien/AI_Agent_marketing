@@ -1,0 +1,34 @@
+{
+  "name": "repoops-ai-command-center",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "test": "vitest run --config vitest.config.ts",
+    "typecheck": "tsc -b",
+    "smoke": "node scripts/smoke-agent-flow.cjs",
+    "telegram:bot": "tsx scripts/telegram-bot.ts",
+    "telegram:setup": "tsx scripts/telegram-setup.ts",
+    "check": "npm run test && npm run typecheck && npm run build"
+  },
+  "dependencies": {
+    "lucide-react": "^0.468.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1"
+  },
+  "devDependencies": {
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.1.0",
+    "@types/react": "^18.3.12",
+    "@types/react-dom": "^18.3.1",
+    "@vitejs/plugin-react": "^4.7.0",
+    "jsdom": "^25.0.1",
+    "playwright": "^1.61.1",
+    "tsx": "^4.23.0",
+    "typescript": "^5.6.3",
+    "vite": "^6.4.3",
+    "vitest": "^4.1.10"
+  }
+}

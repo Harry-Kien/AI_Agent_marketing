@@ -1,0 +1,533 @@
+import type { AppData } from "../domain/types";
+
+export const seedData: AppData = {
+  repos: [
+    {
+      id: "repo-001",
+      name: "AI Social Media Automation",
+      provider: "GitHub",
+      url: "https://github.com/demo/ai-social-automation",
+      purpose: "Tự động gom trend, tạo lịch nội dung và checklist đăng bài.",
+      business_area: "marketing",
+      status: "active",
+      owner_agent: "agent-radar",
+      health_score: 78,
+      last_activity: "2026-07-07",
+      next_action: "Hoàn tất quality gate cho pipeline xuất bài."
+    },
+    {
+      id: "repo-002",
+      name: "Repo Trend Radar",
+      provider: "GitLab",
+      url: "https://gitlab.com/demo/repo-trend-radar",
+      purpose: "Theo dõi xu hướng repo, dependency và ý tưởng sản phẩm.",
+      business_area: "research",
+      status: "active",
+      owner_agent: "agent-radar",
+      health_score: 64,
+      last_activity: "2026-07-06",
+      next_action: "Kiểm tra cảnh báo dependency và test flaky."
+    },
+    {
+      id: "repo-003",
+      name: "AI Content Agent",
+      provider: "GitHub",
+      url: "https://github.com/demo/ai-content-agent",
+      purpose: "Tạo outline, bản nháp và checklist biên tập cho nội dung dài.",
+      business_area: "AI tool",
+      status: "active",
+      owner_agent: "agent-docs",
+      health_score: 91,
+      last_activity: "2026-07-07",
+      next_action: "Chuẩn bị release note cho bản demo giáo viên."
+    },
+    {
+      id: "repo-004",
+      name: "Lark Operations Dashboard",
+      provider: "GitHub",
+      url: "https://github.com/demo/lark-ops-dashboard",
+      purpose: "Bảng điều phối công việc theo mô hình Lark Base.",
+      business_area: "internal ops",
+      status: "idea",
+      owner_agent: "agent-pm",
+      health_score: 55,
+      last_activity: "2026-07-05",
+      next_action: "Chốt schema export Lark Base."
+    },
+    {
+      id: "repo-005",
+      name: "Thesis Demo App",
+      provider: "GitLab",
+      url: "https://gitlab.com/demo/thesis-demo-app",
+      purpose: "Minh họa AI Agent vận hành SME cho khóa luận.",
+      business_area: "automation",
+      status: "paused",
+      owner_agent: "agent-release",
+      health_score: 83,
+      last_activity: "2026-07-04",
+      next_action: "Viết flow demo và giới hạn phần mock."
+    }
+  ],
+  agents: [
+    {
+      id: "agent-pm",
+      name: "CEO/PM Agent",
+      department: "Command",
+      mission: "Ưu tiên repo, tạo roadmap và daily brief cho người điều hành.",
+      input_schema: ["repo_status", "task_priority", "deadline"],
+      output_schema: ["roadmap", "decision_log", "daily_brief"],
+      current_tasks: ["task-001", "task-012"],
+      status: "working"
+    },
+    {
+      id: "agent-radar",
+      name: "Repo Radar Agent",
+      department: "Radar",
+      mission: "Theo dõi repo, dependency, issue và tín hiệu xu hướng.",
+      input_schema: ["repo_url", "health_snapshot", "trend_signal"],
+      output_schema: ["risk_note", "dependency_alert", "opportunity"],
+      current_tasks: ["task-002", "task-006", "task-015"],
+      status: "working"
+    },
+    {
+      id: "agent-spec",
+      name: "Spec Agent",
+      department: "Spec",
+      mission: "Biến ý tưởng mơ hồ thành yêu cầu rõ, có acceptance criteria.",
+      input_schema: ["idea", "repo_context", "user_goal"],
+      output_schema: ["spec", "acceptance_criteria", "test_notes"],
+      current_tasks: ["task-003", "task-010"],
+      status: "idle"
+    },
+    {
+      id: "agent-coding",
+      name: "Coding Agent",
+      department: "Build",
+      mission: "Tạo kế hoạch triển khai, checklist code và đề xuất PR.",
+      input_schema: ["spec", "repo_context", "quality_gate"],
+      output_schema: ["implementation_plan", "change_list", "risk"],
+      current_tasks: ["task-004", "task-011", "task-018"],
+      status: "working"
+    },
+    {
+      id: "agent-review",
+      name: "Review Agent",
+      department: "Quality",
+      mission: "Review chất lượng, test, bug và rủi ro trước khi release.",
+      input_schema: ["diff_summary", "test_output", "risk_note"],
+      output_schema: ["review_findings", "gate_result", "fix_list"],
+      current_tasks: ["task-005", "task-014"],
+      status: "blocked"
+    },
+    {
+      id: "agent-docs",
+      name: "Docs Agent",
+      department: "Docs",
+      mission: "Viết README, changelog, hướng dẫn demo và tài liệu chuyển giao.",
+      input_schema: ["feature_summary", "demo_flow", "audience"],
+      output_schema: ["readme", "demo_script", "release_note"],
+      current_tasks: ["task-007", "task-016"],
+      status: "working"
+    },
+    {
+      id: "agent-release",
+      name: "Release Agent",
+      department: "Release",
+      mission: "Chuẩn bị release note, checklist và điều kiện publish.",
+      input_schema: ["review_result", "version", "stakeholder"],
+      output_schema: ["release_checklist", "go_no_go", "rollback_note"],
+      current_tasks: ["task-008", "task-019"],
+      status: "idle"
+    },
+    {
+      id: "agent-analytics",
+      name: "Analytics Agent",
+      department: "Analytics",
+      mission: "Đo hiệu quả, tốc độ xử lý, bottleneck và kết quả sau release.",
+      input_schema: ["cycle_time", "release_result", "feedback"],
+      output_schema: ["metrics", "bottleneck", "next_experiment"],
+      current_tasks: ["task-009", "task-020"],
+      status: "idle"
+    }
+  ],
+  tasks: [
+    {
+      id: "task-001",
+      title: "Chốt ưu tiên tuần cho 5 repo demo",
+      repo_id: "repo-001",
+      status: "review",
+      priority: "urgent",
+      assigned_agent: "agent-pm",
+      input: "Danh sách repo và mục tiêu demo khóa luận.",
+      expected_output: "Top 5 việc cần làm theo tác động demo.",
+      quality_gate: "Có lý do ưu tiên và owner rõ.",
+      evidence: "PM draft v1",
+      created_at: "2026-07-01",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-002",
+      title: "Audit dependency cho Repo Trend Radar",
+      repo_id: "repo-002",
+      status: "testing",
+      priority: "high",
+      assigned_agent: "agent-radar",
+      input: "Health check cảnh báo dependency cũ.",
+      expected_output: "Risk note và đề xuất nâng cấp.",
+      quality_gate: "Có mức độ rủi ro và bước kiểm tra lại.",
+      evidence: "npm audit mock",
+      created_at: "2026-07-01",
+      updated_at: "2026-07-06"
+    },
+    {
+      id: "task-003",
+      title: "Viết spec export Lark Base",
+      repo_id: "repo-004",
+      status: "spec",
+      priority: "urgent",
+      assigned_agent: "agent-spec",
+      input: "Cần export Repos, Tasks, Agents, Agent Runs, Daily Briefs.",
+      expected_output: "Schema rõ và mapping field.",
+      quality_gate: "Không cần API thật nhưng phải có adapter.",
+      evidence: "",
+      created_at: "2026-07-02",
+      updated_at: "2026-07-06"
+    },
+    {
+      id: "task-004",
+      title: "Tạo Kanban task pipeline",
+      repo_id: "repo-004",
+      status: "coding",
+      priority: "high",
+      assigned_agent: "agent-coding",
+      input: "Task đi qua idea tới measured.",
+      expected_output: "Có cột trạng thái và nút chuyển trạng thái.",
+      quality_gate: "Không làm mất dữ liệu khi đổi status.",
+      evidence: "UI draft",
+      created_at: "2026-07-02",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-005",
+      title: "Review risk trước release AI Content Agent",
+      repo_id: "repo-003",
+      status: "review",
+      priority: "medium",
+      assigned_agent: "agent-review",
+      input: "Feature summary và test output.",
+      expected_output: "Danh sách bug/risk trước demo.",
+      quality_gate: "Có go/no-go rõ.",
+      evidence: "Review queue",
+      created_at: "2026-07-02",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-006",
+      title: "Ghi chú trend AI workforce cho repo radar",
+      repo_id: "repo-002",
+      status: "measured",
+      priority: "medium",
+      assigned_agent: "agent-radar",
+      input: "Tín hiệu thị trường AI Agent.",
+      expected_output: "3 insight áp dụng cho SME.",
+      quality_gate: "Insight gắn với hành động repo.",
+      evidence: "Measured after brief",
+      created_at: "2026-07-01",
+      updated_at: "2026-07-05"
+    },
+    {
+      id: "task-007",
+      title: "Viết README demo cho Thesis Demo App",
+      repo_id: "repo-005",
+      status: "issue",
+      priority: "high",
+      assigned_agent: "agent-docs",
+      input: "Demo flow giáo viên/nhà đầu tư.",
+      expected_output: "README có quick start và phần mock.",
+      quality_gate: "Người khác chạy được local.",
+      evidence: "",
+      created_at: "2026-07-03",
+      updated_at: "2026-07-05"
+    },
+    {
+      id: "task-008",
+      title: "Chuẩn bị release checklist cho AI Content Agent",
+      repo_id: "repo-003",
+      status: "ready_to_release",
+      priority: "urgent",
+      assigned_agent: "agent-release",
+      input: "Review đã qua, cần checklist demo.",
+      expected_output: "Release note và checklist cuối.",
+      quality_gate: "Không còn blocker quan trọng.",
+      evidence: "Smoke pass",
+      created_at: "2026-07-03",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-009",
+      title: "Đo bottleneck từ task spec sang coding",
+      repo_id: "repo-004",
+      status: "idea",
+      priority: "low",
+      assigned_agent: "agent-analytics",
+      input: "Thời gian chuyển trạng thái trong pipeline.",
+      expected_output: "Metric cycle time và bottleneck.",
+      quality_gate: "Có đề xuất cải thiện.",
+      evidence: "",
+      created_at: "2026-07-04",
+      updated_at: "2026-07-04"
+    },
+    {
+      id: "task-010",
+      title: "Spec module daily brief rule-based",
+      repo_id: "repo-004",
+      status: "spec",
+      priority: "high",
+      assigned_agent: "agent-spec",
+      input: "Daily brief không bắt buộc OpenAI key.",
+      expected_output: "Template rule-based cho ngày hiện tại.",
+      quality_gate: "Brief có rủi ro, task ưu tiên, hành động.",
+      evidence: "Template outline",
+      created_at: "2026-07-04",
+      updated_at: "2026-07-06"
+    },
+    {
+      id: "task-011",
+      title: "Thiết kế form thêm repo",
+      repo_id: "repo-004",
+      status: "coding",
+      priority: "medium",
+      assigned_agent: "agent-coding",
+      input: "Repo Registry cần thêm/sửa repo local.",
+      expected_output: "Form dùng được, validation cơ bản.",
+      quality_gate: "Repo mới hiện ngay trên dashboard.",
+      evidence: "",
+      created_at: "2026-07-04",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-012",
+      title: "Daily brief cho ngày demo",
+      repo_id: "repo-001",
+      status: "released",
+      priority: "medium",
+      assigned_agent: "agent-pm",
+      input: "Dữ liệu dashboard hiện tại.",
+      expected_output: "Brief sẵn trình bày.",
+      quality_gate: "Có hành động hôm nay.",
+      evidence: "Brief published",
+      created_at: "2026-07-05",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-013",
+      title: "Tạo prompt kiểm thử output content",
+      repo_id: "repo-003",
+      status: "testing",
+      priority: "medium",
+      assigned_agent: "agent-review",
+      input: "Content Agent tạo bài dài.",
+      expected_output: "Checklist kiểm chất lượng output.",
+      quality_gate: "Có tiêu chí factuality và tone.",
+      evidence: "Prompt v1",
+      created_at: "2026-07-05",
+      updated_at: "2026-07-06"
+    },
+    {
+      id: "task-014",
+      title: "Chặn release nếu build đỏ",
+      repo_id: "repo-002",
+      status: "review",
+      priority: "urgent",
+      assigned_agent: "agent-review",
+      input: "Health check đang warning/failing.",
+      expected_output: "Gate rule cho release readiness.",
+      quality_gate: "Không release khi tests failing.",
+      evidence: "Blocker raised",
+      created_at: "2026-07-05",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-015",
+      title: "Tạo radar card cho repo paused",
+      repo_id: "repo-005",
+      status: "idea",
+      priority: "low",
+      assigned_agent: "agent-radar",
+      input: "Repo đang paused nhưng còn giá trị demo.",
+      expected_output: "Card nêu điều kiện mở lại.",
+      quality_gate: "Có trigger tái khởi động.",
+      evidence: "",
+      created_at: "2026-07-05",
+      updated_at: "2026-07-05"
+    },
+    {
+      id: "task-016",
+      title: "Viết changelog cho bản MVP",
+      repo_id: "repo-004",
+      status: "issue",
+      priority: "medium",
+      assigned_agent: "agent-docs",
+      input: "Danh sách màn hình và mock/integration.",
+      expected_output: "Changelog dễ đọc.",
+      quality_gate: "Nêu rõ local-only.",
+      evidence: "",
+      created_at: "2026-07-06",
+      updated_at: "2026-07-06"
+    },
+    {
+      id: "task-017",
+      title: "Chuẩn hóa field business_area",
+      repo_id: "repo-001",
+      status: "ready_to_release",
+      priority: "high",
+      assigned_agent: "agent-spec",
+      input: "Các repo có nhóm nghiệp vụ khác nhau.",
+      expected_output: "Danh mục nhất quán cho filter.",
+      quality_gate: "Filter không tạo giá trị rác.",
+      evidence: "Enum agreed",
+      created_at: "2026-07-06",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-018",
+      title: "Tạo agent run mock output",
+      repo_id: "repo-004",
+      status: "coding",
+      priority: "high",
+      assigned_agent: "agent-coding",
+      input: "Nút Run simulated agent.",
+      expected_output: "Record Agent Runs có output có cấu trúc.",
+      quality_gate: "Không gọi API thật.",
+      evidence: "",
+      created_at: "2026-07-06",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-019",
+      title: "Release note cho dashboard nội bộ",
+      repo_id: "repo-004",
+      status: "ready_to_release",
+      priority: "medium",
+      assigned_agent: "agent-release",
+      input: "MVP command center.",
+      expected_output: "Release note ngắn cho demo.",
+      quality_gate: "Nêu rõ limitation.",
+      evidence: "Draft ready",
+      created_at: "2026-07-06",
+      updated_at: "2026-07-07"
+    },
+    {
+      id: "task-020",
+      title: "Đo kết quả sau daily brief",
+      repo_id: "repo-001",
+      status: "measured",
+      priority: "low",
+      assigned_agent: "agent-analytics",
+      input: "Task được xử lý sau brief.",
+      expected_output: "Metric hoàn thành và việc tồn.",
+      quality_gate: "Có lesson learned.",
+      evidence: "2 tasks moved",
+      created_at: "2026-07-06",
+      updated_at: "2026-07-07"
+    }
+  ],
+  healthChecks: [
+    {
+      id: "health-001",
+      repo_id: "repo-001",
+      build: "passing",
+      tests: "warning",
+      docs: "passing",
+      security: "passing",
+      summary: "Build ổn, cần bổ sung test cho scheduler.",
+      checked_at: "2026-07-07"
+    },
+    {
+      id: "health-002",
+      repo_id: "repo-002",
+      build: "warning",
+      tests: "failing",
+      docs: "warning",
+      security: "warning",
+      summary: "Test flaky và dependency cần nâng cấp.",
+      checked_at: "2026-07-06"
+    },
+    {
+      id: "health-003",
+      repo_id: "repo-003",
+      build: "passing",
+      tests: "passing",
+      docs: "passing",
+      security: "passing",
+      summary: "Sẵn sàng release demo có kiểm soát.",
+      checked_at: "2026-07-07"
+    },
+    {
+      id: "health-004",
+      repo_id: "repo-004",
+      build: "failing",
+      tests: "warning",
+      docs: "warning",
+      security: "passing",
+      summary: "Chưa có adapter/export hoàn chỉnh.",
+      checked_at: "2026-07-07"
+    },
+    {
+      id: "health-005",
+      repo_id: "repo-005",
+      build: "passing",
+      tests: "warning",
+      docs: "passing",
+      security: "passing",
+      summary: "Repo paused, đủ dùng cho demo học thuật.",
+      checked_at: "2026-07-04"
+    }
+  ],
+  dailyBriefs: [
+    {
+      id: "brief-2026-07-07",
+      date: "2026-07-07",
+      attention_repos: ["repo-002", "repo-004", "repo-003"],
+      priority_tasks: ["task-001", "task-003", "task-008", "task-014", "task-018"],
+      blocked_tasks: ["task-014"],
+      suggested_actions: [
+        "Khóa release Repo Trend Radar cho tới khi test hết failing.",
+        "Hoàn tất adapter export Lark Base trước khi demo.",
+        "Dùng AI Content Agent làm ví dụ repo release-ready."
+      ],
+      risks: [
+        "Nếu task không có evidence, agent handoff sẽ khó kiểm chứng.",
+        "Lark API chưa nối thật nên cần nói rõ đây là export placeholder."
+      ],
+      yesterday_results: [
+        "Chuẩn hóa pipeline trạng thái.",
+        "Chốt 8 agent theo mô hình phòng ban số."
+      ]
+    },
+    {
+      id: "brief-2026-07-06",
+      date: "2026-07-06",
+      attention_repos: ["repo-002", "repo-005"],
+      priority_tasks: ["task-002", "task-007", "task-010"],
+      blocked_tasks: [],
+      suggested_actions: [
+        "Đẩy task daily brief sang spec.",
+        "Viết README demo cho repo luận văn."
+      ],
+      risks: ["Dependency warning có thể làm demo kém tin cậy."],
+      yesterday_results: ["Tạo danh sách repo mẫu.", "Gắn owner agent cho từng repo."]
+    },
+    {
+      id: "brief-2026-07-05",
+      date: "2026-07-05",
+      attention_repos: ["repo-004"],
+      priority_tasks: ["task-004", "task-011"],
+      blocked_tasks: [],
+      suggested_actions: ["Bắt đầu từ registry và dashboard trước."],
+      risks: ["Scope dễ phình nếu nối API thật quá sớm."],
+      yesterday_results: ["Chọn local data thay vì database cho MVP."]
+    }
+  ],
+  agentRuns: []
+};
