@@ -5,15 +5,22 @@ export type MarketingCampaignStage =
   | "research_pending_approval"
   | "content_running"
   | "content_pending_approval"
+  | "creative_running"
+  | "creative_pending_approval"
   | "brand_running"
   | "brand_pending_approval"
   | "finalizing"
   | "final_pending_approval"
   | "rework_required"
-  | "ready_to_execute"
+  | "ready_to_schedule"
+  | "publication_pending_confirmation"
+  | "publishing"
+  | "published"
+  | "measuring"
+  | "optimization_proposed"
   | "failed";
 
-export type MarketingRunStage = "research" | "content" | "brand" | "final";
+export type MarketingRunStage = "research" | "content" | "creative" | "brand" | "final";
 export type MarketingRunStatus =
   | "running"
   | "pending_approval"
@@ -28,6 +35,9 @@ export interface MarketingCampaignRuntime {
   stage: MarketingCampaignStage;
   activeRunId?: string;
   approvedRunIds: string[];
+  publicationPreview?: string;
+  publicationConfirmedBy?: string;
+  publicationEvidence?: { postId: string; permalink?: string; publishedAt: string };
   createdBy: string;
   createdAt: string;
   updatedAt: string;
@@ -57,6 +67,9 @@ export type MarketingAuditAction =
   | "revision_started"
   | "provider_fallback"
   | "campaign_ready"
+  | "publication_requested"
+  | "publication_confirmed"
+  | "publication_completed"
   | "runtime_recovered";
 
 export interface TelegramAuditEvent {
@@ -81,6 +94,7 @@ type Clock = () => string;
 const roles: Record<MarketingRunStage, MarketingBotRole> = {
   research: "market-radar",
   content: "content-creator",
+  creative: "creative-production",
   brand: "performance-brand",
   final: "manager"
 };
@@ -88,6 +102,7 @@ const roles: Record<MarketingRunStage, MarketingBotRole> = {
 const runningStages: Record<MarketingRunStage, MarketingCampaignStage> = {
   research: "research_running",
   content: "content_running",
+  creative: "creative_running",
   brand: "brand_running",
   final: "finalizing"
 };
@@ -95,13 +110,15 @@ const runningStages: Record<MarketingRunStage, MarketingCampaignStage> = {
 const pendingStages: Record<MarketingRunStage, MarketingCampaignStage> = {
   research: "research_pending_approval",
   content: "content_pending_approval",
+  creative: "creative_pending_approval",
   brand: "brand_pending_approval",
   final: "final_pending_approval"
 };
 
 const nextStages: Partial<Record<MarketingRunStage, MarketingRunStage>> = {
   research: "content",
-  content: "brand",
+  content: "creative",
+  creative: "brand",
   brand: "final"
 };
 
@@ -126,7 +143,7 @@ function campaignId(timestamp: string, suffix: string) {
 }
 
 function stageCode(stage: MarketingRunStage) {
-  return ({ research: "RSH", content: "CNT", brand: "BRD", final: "FIN" })[stage];
+  return ({ research: "RSH", content: "CNT", creative: "CRT", brand: "BRD", final: "FIN" })[stage];
 }
 
 function createRunId(
@@ -318,7 +335,7 @@ export function approveRun(
 
   const nextStage = nextStages[run.stage];
   if (!nextStage) {
-    campaign.stage = "ready_to_execute";
+    campaign.stage = "ready_to_schedule";
     campaign.activeRunId = undefined;
     audit(state, {
       campaignId: campaign.id,
@@ -326,7 +343,7 @@ export function approveRun(
       actorType: "system",
       actorId: "marketing-manager",
       action: "campaign_ready",
-      summary: "Campaign is human-approved and ready for manual execution.",
+      summary: "Campaign is human-approved and ready to prepare a publication preview.",
       createdAt: timestamp
     });
     return { state, campaign, run, alreadyApplied: false as const };
@@ -401,6 +418,83 @@ export function reviseRun(
     createdAt: timestamp
   });
   return { state, campaign, run };
+}
+
+export function requestPublicationConfirmation(
+  current: MarketingWorkflowState,
+  campaignIdValue: string,
+  actorId: string,
+  now: Clock = () => new Date().toISOString()
+) {
+  const state = cloneState(current);
+  const campaign = requireCampaign(state, campaignIdValue);
+  if (campaign.stage !== "ready_to_schedule") {
+    throw new Error(`Campaign ${campaign.id} must be ready_to_schedule.`);
+  }
+  const timestamp = now();
+  campaign.stage = "publication_pending_confirmation";
+  campaign.publicationPreview = `Bản xem trước xuất bản: ${campaign.brief}`;
+  campaign.updatedAt = timestamp;
+  audit(state, {
+    campaignId: campaign.id,
+    actorType: "human",
+    actorId,
+    action: "publication_requested",
+    summary: "Publication preview created; explicit confirmation is required.",
+    createdAt: timestamp
+  });
+  return { state, campaign };
+}
+
+export function confirmPublication(
+  current: MarketingWorkflowState,
+  campaignIdValue: string,
+  actorId: string,
+  now: Clock = () => new Date().toISOString()
+) {
+  const state = cloneState(current);
+  const campaign = requireCampaign(state, campaignIdValue);
+  if (campaign.stage !== "publication_pending_confirmation") {
+    throw new Error(`Campaign ${campaign.id} must be publication_pending_confirmation.`);
+  }
+  const timestamp = now();
+  campaign.stage = "publishing";
+  campaign.publicationConfirmedBy = actorId;
+  campaign.updatedAt = timestamp;
+  audit(state, {
+    campaignId: campaign.id,
+    actorType: "human",
+    actorId,
+    action: "publication_confirmed",
+    summary: "Human operator confirmed the exact publication preview.",
+    createdAt: timestamp
+  });
+  return { state, campaign };
+}
+
+export function completePublication(
+  current: MarketingWorkflowState,
+  campaignIdValue: string,
+  evidence: { postId: string; permalink?: string },
+  now: Clock = () => new Date().toISOString()
+) {
+  if (!evidence.postId.trim()) throw new Error("Publication evidence requires a postId.");
+  const state = cloneState(current);
+  const campaign = requireCampaign(state, campaignIdValue);
+  if (campaign.stage !== "publishing") throw new Error(`Campaign ${campaign.id} must be publishing.`);
+  const timestamp = now();
+  campaign.stage = "published";
+  campaign.publicationEvidence = { ...evidence, postId: evidence.postId.trim(), publishedAt: timestamp };
+  campaign.updatedAt = timestamp;
+  audit(state, {
+    campaignId: campaign.id,
+    actorType: "system",
+    actorId: "meta-graph",
+    action: "publication_completed",
+    summary: `Publication completed with evidence ${evidence.postId}.`,
+    createdAt: timestamp
+  });
+  return { state, campaign };
 }
 
 export function buildStageInput(state: MarketingWorkflowState, runId: string) {

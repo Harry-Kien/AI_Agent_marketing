@@ -5,6 +5,9 @@ import {
   completeRun,
   createCampaign,
   createEmptyWorkflowState,
+  requestPublicationConfirmation,
+  confirmPublication,
+  completePublication,
   listPendingRuns,
   rejectRun,
   reviseRun
@@ -31,7 +34,7 @@ describe("enterprise marketing workflow", () => {
     expect(result.state.runs).toHaveLength(1);
   });
 
-  it("moves through all four approval gates without skipping departments", () => {
+  it("moves through all five approval gates without skipping departments", () => {
     let state = createCampaign(createEmptyWorkflowState(), {
       brief: "Ra mat dich vu AI Agent cho SME",
       createdBy: "owner",
@@ -54,8 +57,15 @@ describe("enterprise marketing workflow", () => {
     state = completeRun(state, content.id, "Content package", clock).state;
     approval = approveRun(state, content.id, "owner", clock);
     state = approval.state;
-    expect(approval.nextRun?.stage).toBe("brand");
+    expect(approval.nextRun?.stage).toBe("creative");
     expect(buildStageInput(state, approval.nextRun!.id)).toContain("Content package");
+
+    const creative = approval.nextRun!;
+    state = completeRun(state, creative.id, "Creative package", clock).state;
+    approval = approveRun(state, creative.id, "owner", clock);
+    state = approval.state;
+    expect(approval.nextRun?.stage).toBe("brand");
+    expect(buildStageInput(state, approval.nextRun!.id)).toContain("Creative package");
 
     const brand = approval.nextRun!;
     state = completeRun(state, brand.id, "Brand and KPI review", clock).state;
@@ -69,8 +79,8 @@ describe("enterprise marketing workflow", () => {
     approval = approveRun(state, finalRun.id, "owner", clock);
 
     expect(approval.nextRun).toBeUndefined();
-    expect(approval.state.campaigns[0].stage).toBe("ready_to_execute");
-    expect(approval.state.campaigns[0].approvedRunIds).toHaveLength(4);
+    expect(approval.state.campaigns[0].stage).toBe("ready_to_schedule");
+    expect(approval.state.campaigns[0].approvedRunIds).toHaveLength(5);
   });
 
   it("requires a rejection reason and starts a traceable revision", () => {
@@ -143,5 +153,35 @@ describe("enterprise marketing workflow", () => {
     expect(() => approveRun(created.state, created.run.id, "owner", clock)).toThrow(
       /pending_approval/
     );
+  });
+
+  it("requires two-step publication confirmation and stores external evidence", () => {
+    let state = createCampaign(createEmptyWorkflowState(), {
+      brief: "Campaign publication guard",
+      createdBy: "owner",
+      now: clock,
+      idSuffix: "PUB"
+    }).state;
+    for (const stage of ["research", "content", "creative", "brand", "final"] as const) {
+      const run = state.runs.find((item) => item.status === "running" && item.stage === stage)!;
+      state = completeRun(state, run.id, `${stage} package`, clock).state;
+      state = approveRun(state, run.id, "owner", clock).state;
+    }
+
+    const preview = requestPublicationConfirmation(state, state.campaigns[0].id, "owner", clock);
+    expect(preview.campaign.stage).toBe("publication_pending_confirmation");
+    expect(preview.campaign.publicationPreview).toContain("Campaign publication guard");
+
+    const confirmed = confirmPublication(preview.state, preview.campaign.id, "owner", clock);
+    expect(confirmed.campaign.stage).toBe("publishing");
+
+    const published = completePublication(
+      confirmed.state,
+      confirmed.campaign.id,
+      { postId: "page_123", permalink: "https://facebook.test/page_123" },
+      clock
+    );
+    expect(published.campaign.stage).toBe("published");
+    expect(published.campaign.publicationEvidence?.postId).toBe("page_123");
   });
 });

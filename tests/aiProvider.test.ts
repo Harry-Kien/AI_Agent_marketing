@@ -46,12 +46,31 @@ describe("9Router/OpenAI-compatible AI provider", () => {
       context: "Campaign launch"
     });
 
-    expect(prompt.system).toContain("Content Creator Bot");
+    expect(prompt.system).toContain("Content Strategy & Copy Agent");
     expect(prompt.system).toContain("Bộ kỹ năng");
     expect(prompt.user).toContain("/post");
     expect(prompt.user).toContain("AI Agent cho SME");
     expect(prompt.user).toContain("con người phê duyệt");
     expect(prompt.user).not.toContain("Lark");
+  });
+
+  it("keeps creative production and community growth responsibilities separate", () => {
+    const creative = buildMarketingPrompt({
+      role: "creative-production",
+      command: "creative",
+      topic: "Bài Facebook AI cho SME"
+    });
+    const growth = buildMarketingPrompt({
+      role: "page-growth",
+      command: "community",
+      topic: "Phản hồi bình luận khách hàng"
+    });
+
+    expect(creative.system).toContain("Creative Production Agent");
+    expect(creative.system).toContain("visual brief");
+    expect(growth.system).toContain("Page Growth & Community Agent");
+    expect(growth.system).toContain("chăm sóc cộng đồng");
+    expect(growth.system.toLowerCase()).toContain("không tự đăng");
   });
 
   it("calls an OpenAI-compatible chat completion endpoint when enabled", async () => {
@@ -134,7 +153,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     );
 
     expect(output.mode).toBe("mock");
-    expect(output.text).toContain("Performance Brand Bot");
+    expect(output.text).toContain("Brand & Performance Agent");
     expect(output.text).toContain("AI Agent cho SME");
   });
 

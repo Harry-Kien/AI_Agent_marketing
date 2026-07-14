@@ -60,7 +60,9 @@ interface RuntimeController {
 const specialistCommands = new Set([
   "trend", "competitor", "audience", "insight", "angle",
   "post", "caption", "script", "calendar", "hook",
-  "review", "brandcheck", "cta", "measure"
+  "creative", "visual", "storyboard", "asset", "variant",
+  "review", "brandcheck", "cta", "measure",
+  "community", "inbox", "schedule", "publish", "metrics"
 ]);
 
 const managerCommands = new Set([
@@ -73,7 +75,9 @@ const roleCommands: Record<MarketingBotRole, Set<string>> = {
   manager: managerCommands,
   "market-radar": new Set(["start", "help", "trend", "competitor", "audience", "insight", "angle", "whoami"]),
   "content-creator": new Set(["start", "help", "post", "caption", "script", "calendar", "hook", "whoami"]),
-  "performance-brand": new Set(["start", "help", "review", "brandcheck", "cta", "measure", "report", "whoami"])
+  "creative-production": new Set(["start", "help", "creative", "visual", "storyboard", "asset", "variant", "whoami"]),
+  "performance-brand": new Set(["start", "help", "review", "brandcheck", "cta", "measure", "report", "whoami"]),
+  "page-growth": new Set(["start", "help", "community", "inbox", "schedule", "publish", "metrics", "whoami"])
 };
 
 const workflowCommands = new Set([
@@ -83,6 +87,7 @@ const workflowCommands = new Set([
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
   research: "trend",
   content: "post",
+  creative: "creative",
   brand: "review",
   final: "finalize"
 };
@@ -91,7 +96,9 @@ const roleUpdatePrefixes: Record<MarketingBotRole, number> = {
   manager: 1,
   "market-radar": 2,
   "content-creator": 3,
-  "performance-brand": 4
+  "creative-production": 4,
+  "performance-brand": 5,
+  "page-growth": 6
 };
 
 function loadDotEnv() {
@@ -209,13 +216,15 @@ function roleLabel(role: MarketingBotRole) {
   return ({
     manager: "Marketing Manager",
     "market-radar": "Market Radar",
-    "content-creator": "Content Creator",
-    "performance-brand": "Performance Brand"
+    "content-creator": "Content Strategy & Copy",
+    "creative-production": "Creative Production",
+    "performance-brand": "Brand & Performance",
+    "page-growth": "Page Growth & Community"
   })[role];
 }
 
 function stageLabel(stage: MarketingAgentRunRuntime["stage"]) {
-  return ({ research: "Research", content: "Content", brand: "Brand & KPI", final: "Final Package" })[stage];
+  return ({ research: "Research", content: "Content Strategy", creative: "Creative Production", brand: "Brand & KPI", final: "Final Package" })[stage];
 }
 
 function formatRunResult(run: MarketingAgentRunRuntime, output: MarketingAgentOutput) {
@@ -240,11 +249,11 @@ function formatCampaignStatus(campaign: MarketingCampaignRuntime, runs: Marketin
     `CHIẾN DỊCH ${campaign.id}`,
     `Mục tiêu: ${campaign.brief}`,
     `Trạng thái: ${campaign.stage}`,
-    `Đã duyệt: ${campaign.approvedRunIds.length}/4 cổng`,
+    `Đã duyệt: ${campaign.approvedRunIds.length}/5 cổng`,
     `Run hiện tại: ${campaign.activeRunId ?? "không có"}`,
     "",
     ...campaignRuns.map((run) => `- ${run.id} | ${stageLabel(run.stage)} | ${run.status}`),
-    campaign.stage === "ready_to_execute"
+    campaign.stage === "ready_to_schedule"
       ? "Kết luận: sẵn sàng triển khai thủ công; hệ thống chưa tự đăng hoặc chạy quảng cáo."
       : "Bước tiếp theo: xem /approvals hoặc chờ bot chuyên môn hoàn thành."
   ].join("\n");
@@ -255,7 +264,7 @@ function formatCampaigns(snapshot: TelegramRuntimeSnapshot) {
   return [
     "DANH SÁCH CHIẾN DỊCH",
     ...snapshot.workflow.campaigns.slice(-10).reverse().map((campaign) =>
-      `- ${campaign.id} | ${campaign.stage} | ${campaign.approvedRunIds.length}/4 cổng | ${campaign.brief.slice(0, 70)}`
+      `- ${campaign.id} | ${campaign.stage} | ${campaign.approvedRunIds.length}/5 cổng | ${campaign.brief.slice(0, 70)}`
     ),
     "Chi tiết: /status <CAMPAIGN_ID>"
   ].join("\n");
@@ -423,7 +432,7 @@ async function handleWorkflowCommand(
     if (!approved.nextRun) {
       await sendMessage(manager.token, chatId, [
         `Đã duyệt cổng cuối cho ${approved.campaign.id}.`,
-        "Trạng thái: ready_to_execute.",
+        "Trạng thái: ready_to_schedule.",
         "Hệ thống không tự đăng bài, chạy ads hoặc chi tiền."
       ].join("\n"));
       return;

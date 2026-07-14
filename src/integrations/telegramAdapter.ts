@@ -46,7 +46,9 @@ export type MarketingBotRole =
   | "manager"
   | "market-radar"
   | "content-creator"
-  | "performance-brand";
+  | "creative-production"
+  | "performance-brand"
+  | "page-growth";
 
 export interface MarketingBotConfig {
   role: MarketingBotRole;
@@ -95,7 +97,7 @@ const marketingBotProfiles: Record<
   },
   "content-creator": {
     role: "content-creator",
-    displayName: "Content Creator Bot",
+    displayName: "Content Strategy & Copy Agent",
     envKey: "TELEGRAM_CONTENT_CREATOR_BOT_TOKEN",
     agentId: "agent-docs",
     commands: ["post", "caption", "script", "calendar", "hook", "help"],
@@ -103,15 +105,35 @@ const marketingBotProfiles: Record<
     description:
       "Content Creator Agent. Biến định hướng chiến dịch thành bản nháp bài viết, caption, hook, kịch bản video ngắn và lịch nội dung, luôn chờ phê duyệt trước khi đăng."
   },
+  "creative-production": {
+    role: "creative-production",
+    displayName: "Creative Production Agent",
+    envKey: "TELEGRAM_CREATIVE_PRODUCTION_BOT_TOKEN",
+    agentId: "agent-creative",
+    commands: ["creative", "visual", "storyboard", "asset", "variant", "help"],
+    shortDescription: "Sản xuất creative brief, visual direction, storyboard và biến thể tài sản.",
+    description:
+      "Creative Production Agent. Chuyển bản nội dung đã duyệt thành visual brief, storyboard, asset checklist và biến thể sáng tạo. Không tự xuất bản hoặc thay đổi nội dung chiến lược."
+  },
   "performance-brand": {
     role: "performance-brand",
-    displayName: "Performance Brand Bot",
+    displayName: "Brand & Performance Agent",
     envKey: "TELEGRAM_PERFORMANCE_BRAND_BOT_TOKEN",
     agentId: "agent-review",
     commands: ["review", "brandcheck", "cta", "measure", "report", "help"],
     shortDescription: "Agent kiểm duyệt thương hiệu, CTA, chất lượng và KPI.",
     description:
       "Performance Brand Agent. Kiểm tra chất lượng nội dung, giọng thương hiệu, CTA, rủi ro tuân thủ, KPI và hiệu quả chiến dịch."
+  },
+  "page-growth": {
+    role: "page-growth",
+    displayName: "Page Growth & Community Agent",
+    envKey: "TELEGRAM_PAGE_GROWTH_BOT_TOKEN",
+    agentId: "agent-growth",
+    commands: ["community", "inbox", "schedule", "publish", "metrics", "help"],
+    shortDescription: "Vận hành lịch Page, cộng đồng, inbox, bằng chứng đăng và chỉ số tăng trưởng.",
+    description:
+      "Page Growth & Community Agent. Chuẩn bị lịch đăng, phân loại bình luận và inbox, thu thập chỉ số. Không tự đăng, xóa, chặn hoặc trả lời nội dung nhạy cảm khi chưa được người quản lý xác nhận."
   }
 };
 
@@ -153,6 +175,15 @@ const marketingCommandMenus: Record<MarketingBotRole, TelegramBotCommand[]> = {
     { command: "calendar", description: "Tạo lịch nội dung" },
     { command: "hook", description: "Tạo hook mở đầu" }
   ],
+  "creative-production": [
+    { command: "start", description: "Bắt đầu Creative Production Agent" },
+    { command: "help", description: "Xem nghiệp vụ sản xuất sáng tạo" },
+    { command: "creative", description: "Tạo creative package" },
+    { command: "visual", description: "Tạo visual direction" },
+    { command: "storyboard", description: "Tạo storyboard" },
+    { command: "asset", description: "Lập asset checklist" },
+    { command: "variant", description: "Tạo biến thể creative" }
+  ],
   "performance-brand": [
     { command: "start", description: "Bắt đầu Performance Brand Agent" },
     { command: "help", description: "Xem lệnh kiểm duyệt" },
@@ -161,6 +192,15 @@ const marketingCommandMenus: Record<MarketingBotRole, TelegramBotCommand[]> = {
     { command: "cta", description: "Gợi ý CTA" },
     { command: "measure", description: "Đo hiệu quả chiến dịch" },
     { command: "report", description: "Tạo báo cáo chiến dịch" }
+  ],
+  "page-growth": [
+    { command: "start", description: "Bắt đầu Page Growth & Community Agent" },
+    { command: "help", description: "Xem nghiệp vụ vận hành Page" },
+    { command: "community", description: "Phân loại tương tác cộng đồng" },
+    { command: "inbox", description: "Xem hàng chờ chăm sóc khách hàng" },
+    { command: "schedule", description: "Chuẩn bị lịch đăng chờ duyệt" },
+    { command: "publish", description: "Tạo bản xem trước chờ xác nhận" },
+    { command: "metrics", description: "Đọc và tóm tắt chỉ số Page" }
   ]
 };
 
@@ -350,6 +390,16 @@ export function getMarketingCampaignHandoffs(topic: string): MarketingHandoff[] 
       ].join("\n")
     },
     {
+      role: "creative-production",
+      message: [
+        "Creative Production Agent - Nhiệm vụ mới",
+        `Nhiệm vụ: chuyển nội dung đã duyệt của chiến dịch "${topic}" thành gói sáng tạo.`,
+        `Lệnh dự phòng: /creative ${topic}`,
+        "Kết quả cần trả: visual direction, storyboard, asset checklist và các biến thể.",
+        "Cổng phê duyệt: creative package phải được duyệt trước khi kiểm định thương hiệu."
+      ].join("\n")
+    },
+    {
       role: "performance-brand",
       message: [
         "Performance Brand Bot - Nhiệm vụ mới",
@@ -357,6 +407,16 @@ export function getMarketingCampaignHandoffs(topic: string): MarketingHandoff[] 
         `Lệnh cần chạy: /review ${topic}`,
         "Kết quả cần trả: điểm chất lượng, rủi ro thương hiệu, cải thiện CTA và KPI đề xuất.",
         "Cổng phê duyệt: không đăng, không chạy ads, không gửi ra ngoài khi chưa có người duyệt."
+      ].join("\n")
+    },
+    {
+      role: "page-growth",
+      message: [
+        "Page Growth & Community Agent - Nhiệm vụ mới",
+        `Nhiệm vụ: chuẩn bị lịch đăng, community inbox và kế hoạch đo lường cho "${topic}".`,
+        `Lệnh dự phòng: /schedule ${topic}`,
+        "Kết quả cần trả: bản xem trước lịch đăng, hàng chờ tương tác và KPI theo dõi.",
+        "Cổng phê duyệt: không tự đăng, trả lời, xóa hay chặn khi chưa có xác nhận của người quản lý."
       ].join("\n")
     }
   ];
@@ -861,7 +921,9 @@ function marketingExpectedOutput(role: MarketingBotRole, command: string) {
     manager: "Kế hoạch vận hành chiến dịch và bản ghi phê duyệt.",
     "market-radar": "Tín hiệu xu hướng, insight khách hàng, góc đối thủ và cơ hội truyền thông.",
     "content-creator": "Bản nháp nội dung, hook, caption, CTA và biến thể theo kênh.",
-    "performance-brand": "Review thương hiệu, điểm chất lượng, đề xuất CTA và ghi chú đo lường."
+    "creative-production": "Visual brief, storyboard, asset checklist và biến thể sáng tạo.",
+    "performance-brand": "Review thương hiệu, điểm chất lượng, đề xuất CTA và ghi chú đo lường.",
+    "page-growth": "Lịch đăng chờ duyệt, hàng chờ cộng đồng, bằng chứng và KPI tăng trưởng."
   };
   return `${outputs[role]} Command: /${command}.`;
 }
@@ -871,7 +933,9 @@ function marketingQualityGate(role: MarketingBotRole) {
     manager: "Có mục tiêu chiến dịch, người phụ trách, thời hạn và phê duyệt của con người.",
     "market-radar": "Insight gắn với nỗi đau khách hàng, khoảng trống đối thủ và hành động kinh doanh.",
     "content-creator": "Nội dung có hook, giá trị, CTA, đúng giọng thương hiệu và không có claim thiếu căn cứ.",
-    "performance-brand": "Output đạt yêu cầu về tone thương hiệu, rủi ro tuân thủ, độ rõ CTA và khả năng đo lường."
+    "creative-production": "Bám nội dung đã duyệt, đủ asset, định dạng và accessibility.",
+    "performance-brand": "Output đạt yêu cầu về tone thương hiệu, rủi ro tuân thủ, độ rõ CTA và khả năng đo lường.",
+    "page-growth": "Không tự đăng hoặc phản hồi nhạy cảm; mọi hành động ngoài hệ thống có xác nhận."
   };
   return gates[role];
 }
@@ -890,6 +954,22 @@ function marketingOutputLines(role: MarketingBotRole, command: string, topic: st
       `Hook: Đừng vận hành marketing bằng ghi chú rời rạc. Hãy biến ${topic} thành một đội AI có quản lý.`,
       "Bản nháp: nêu vấn đề, trình bày luồng 4 bot, rồi mời người xem nhận demo.",
       "CTA: Bình luận 'AGENT' để nhận workflow chiến dịch."
+    ];
+  }
+
+  if (role === "creative-production") {
+    return [
+      `Visual direction: minh họa ${topic} như một phòng marketing AI đang vận hành theo stage-gate.`,
+      "Storyboard: vấn đề vận hành, đội Agent phối hợp, cổng duyệt của con người, kết quả đo lường.",
+      "Asset checklist: ảnh 4:5, 1:1, caption-safe area, alt text và hai biến thể hook."
+    ];
+  }
+
+  if (role === "page-growth") {
+    return [
+      `Lịch dự kiến: chuẩn bị bản xem trước cho ${topic}; chưa gửi lên Page.`,
+      "Community: FAQ thường gặp có thể soạn nháp; giá, khiếu nại và dữ liệu cá nhân phải chuyển người quản lý.",
+      "Đo lường: reach, engagement, CTR, lead đủ điều kiện và thời gian phản hồi."
     ];
   }
 

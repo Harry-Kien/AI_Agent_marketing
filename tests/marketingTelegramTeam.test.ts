@@ -9,25 +9,31 @@ import {
 } from "../src/integrations/telegramAdapter";
 
 describe("Marketing Telegram team adapter", () => {
-  it("loads the four marketing bot tokens from environment without exposing token values", () => {
+  it("loads all six marketing bot identities from environment", () => {
     const configs = getMarketingBotConfigsFromEnv({
       TELEGRAM_MANAGER_BOT_TOKEN: "manager-secret",
       TELEGRAM_MARKET_RADAR_BOT_TOKEN: "radar-secret",
       TELEGRAM_CONTENT_CREATOR_BOT_TOKEN: "content-secret",
-      TELEGRAM_PERFORMANCE_BRAND_BOT_TOKEN: "brand-secret"
+      TELEGRAM_CREATIVE_PRODUCTION_BOT_TOKEN: "creative-secret",
+      TELEGRAM_PERFORMANCE_BRAND_BOT_TOKEN: "brand-secret",
+      TELEGRAM_PAGE_GROWTH_BOT_TOKEN: "growth-secret"
     });
 
     expect(configs.map((config) => config.role)).toEqual([
       "manager",
       "market-radar",
       "content-creator",
-      "performance-brand"
+      "creative-production",
+      "performance-brand",
+      "page-growth"
     ]);
     expect(configs.map((config) => config.displayName)).toEqual([
       "Marketing Manager Bot",
       "Market Radar Bot",
-      "Content Creator Bot",
-      "Performance Brand Bot"
+      "Content Strategy & Copy Agent",
+      "Creative Production Agent",
+      "Brand & Performance Agent",
+      "Page Growth & Community Agent"
     ]);
     expect(configs.every((config) => config.shortDescription.length > 20)).toBe(true);
     expect(configs.every((config) => config.description.includes("Agent") || config.description.includes("phòng"))).toBe(true);
@@ -58,7 +64,9 @@ describe("Marketing Telegram team adapter", () => {
     ]);
     expect(menus["market-radar"].map((item) => item.command)).toContain("trend");
     expect(menus["content-creator"].map((item) => item.command)).toContain("post");
+    expect(menus["creative-production"].map((item) => item.command)).toContain("creative");
     expect(menus["performance-brand"].map((item) => item.command)).toContain("review");
+    expect(menus["page-growth"].map((item) => item.command)).toContain("community");
   });
 
   it("shows a manager-specific help and golden marketing flow", () => {
@@ -95,7 +103,9 @@ describe("Marketing Telegram team adapter", () => {
     expect(handoffs.map((handoff) => handoff.role)).toEqual([
       "market-radar",
       "content-creator",
-      "performance-brand"
+      "creative-production",
+      "performance-brand",
+      "page-growth"
     ]);
     expect(handoffs[0].message).toContain("Nhiệm vụ");
     expect(handoffs[1].message).toContain("/post");
@@ -116,10 +126,10 @@ describe("Marketing Telegram team adapter", () => {
       "Market Radar Bot"
     );
     expect(handleMarketingTeamCommand(session, "/post AI Agent SME", "content-creator").messages.join("\n")).toContain(
-      "Content Creator Bot"
+      "Content Strategy & Copy Agent"
     );
     expect(handleMarketingTeamCommand(session, "/review AI Agent SME", "performance-brand").messages.join("\n")).toContain(
-      "Performance Brand Bot"
+      "Brand & Performance Agent"
     );
     expect(handleMarketingTeamCommand(session, "/post AI Agent SME", "content-creator").messages.join("\n")).toContain(
       "Kết quả có cấu trúc"
