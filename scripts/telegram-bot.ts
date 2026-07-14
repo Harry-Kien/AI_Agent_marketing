@@ -40,6 +40,7 @@ import {
   setBotOffset,
   type TelegramRuntimeSnapshot
 } from "../src/integrations/telegramStateStore";
+import { intentToFallbackCommand, resolveManagerIntent } from "../src/integrations/managerIntent";
 
 interface TelegramUpdate {
   update_id: number;
@@ -122,10 +123,6 @@ function parseCommand(text: string) {
 function shouldBotHandleMessage(role: MarketingBotRole, command: string) {
   if (command === "natural") return role === "manager";
   return roleCommands[role].has(command);
-}
-
-function normalizeMessageForRole(role: MarketingBotRole, text: string, command: string) {
-  return role === "manager" && command === "natural" ? `/campaign ${text.trim()}` : text;
 }
 
 function getBotConfigs(): MarketingBotConfig[] {
@@ -554,7 +551,24 @@ async function processUpdate(
     return;
   }
 
-  const routedText = normalizeMessageForRole(config.role, message.text, parsed.command);
+  let routedText = message.text;
+  if (config.role === "manager" && parsed.command === "natural") {
+    const pendingRunIds = listPendingRuns(controller.snapshot.workflow).map((run) => run.id);
+    const rejectedRunIds = controller.snapshot.workflow.runs
+      .filter((run) => run.status === "rejected")
+      .map((run) => run.id);
+    const decision = await resolveManagerIntent(message.text, {
+      pendingRunIds,
+      rejectedRunIds,
+      campaignIds: controller.snapshot.workflow.campaigns.map((campaign) => campaign.id)
+    });
+    const fallbackCommand = intentToFallbackCommand(decision);
+    if (!fallbackCommand || decision.confidence < 0.82) {
+      await sendMessage(config.token, message.chat.id, decision.clarification ?? "Bạn vui lòng nói rõ yêu cầu.");
+      return;
+    }
+    routedText = fallbackCommand;
+  }
   const routedParsed = parseCommand(routedText);
   if (config.role === "manager" && routedParsed.command === "health") {
     await sendMessage(
