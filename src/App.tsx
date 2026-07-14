@@ -2,6 +2,7 @@ import {
   Activity,
   Bot,
   BriefcaseBusiness,
+  Building2,
   ClipboardList,
   Download,
   FileJson,
@@ -37,8 +38,9 @@ import type {
   TaskStatus
 } from "./domain/types";
 import { exportForLarkBase } from "./integrations/larkAdapter";
+import { AgentOfficeView } from "./features/agent-office/AgentOfficeView";
 
-type View = "dashboard" | "repos" | "tasks" | "agents" | "brief" | "telegram" | "export";
+type View = "office" | "dashboard" | "repos" | "tasks" | "agents" | "brief" | "telegram" | "export";
 
 const storageKey = "repoops-ai-command-center-data";
 const repoStatuses: RepoStatus[] = ["idea", "active", "paused", "archived"];
@@ -47,6 +49,7 @@ const priorities: TaskPriority[] = ["low", "medium", "high", "urgent"];
 const providers: RepoProvider[] = ["GitHub", "GitLab"];
 
 const navItems = [
+  { id: "office" as View, label: "Văn phòng Agent", icon: Building2 },
   { id: "dashboard" as View, label: "Dashboard", icon: LayoutDashboard },
   { id: "repos" as View, label: "Repos", icon: GitBranch },
   { id: "tasks" as View, label: "Tasks", icon: ClipboardList },
@@ -91,7 +94,7 @@ function EmptyState({ title, action }: { title: string; action?: string }) {
 
 function App() {
   const [data, setDataState] = useState<AppData>(loadInitialData);
-  const [activeView, setActiveView] = useState<View>("dashboard");
+  const [activeView, setActiveView] = useState<View>("office");
   const [selectedRepoId, setSelectedRepoId] = useState(data.repos[0]?.id ?? "");
   const [repoFilter, setRepoFilter] = useState({ query: "", status: "all", agent: "all", area: "all" });
   const [editingRepo, setEditingRepo] = useState<RepoRecord | null>(null);
@@ -649,6 +652,7 @@ function App() {
   );
 
   const views: Record<View, JSX.Element> = {
+    office: <AgentOfficeView />,
     dashboard: renderDashboard(),
     repos: renderRepos(),
     tasks: renderTasks(),
@@ -687,7 +691,7 @@ function App() {
       <main>
         <header className="topbar">
           <div>
-            <p className="eyebrow">Local demo • Lark-ready export</p>
+            <p className="eyebrow">AI Marketing Operations · Human approval</p>
             <h2>{navItems.find((item) => item.id === activeView)?.label}</h2>
           </div>
           <button
