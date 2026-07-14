@@ -11,6 +11,7 @@
     "smoke": "node scripts/smoke-agent-flow.cjs",
     "telegram:bot": "tsx scripts/telegram-bot.ts",
     "telegram:setup": "tsx scripts/telegram-setup.ts",
+    "control:api": "tsx scripts/control-api.ts",
     "check": "npm run test && npm run typecheck && npm run build"
   },
   "dependencies": {
