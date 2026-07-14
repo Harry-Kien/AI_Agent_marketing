@@ -51,6 +51,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     expect(prompt.user).toContain("/post");
     expect(prompt.user).toContain("AI Agent cho SME");
     expect(prompt.user).toContain("con người phê duyệt");
+    expect(prompt.user).not.toContain("Lark");
   });
 
   it("calls an OpenAI-compatible chat completion endpoint when enabled", async () => {
@@ -135,5 +136,56 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     expect(output.mode).toBe("mock");
     expect(output.text).toContain("Performance Brand Bot");
     expect(output.text).toContain("AI Agent cho SME");
+  });
+
+  it("falls back safely when the enabled provider request fails", async () => {
+    const fetchMock = vi.fn().mockRejectedValue(new Error("connection refused"));
+
+    const output = await generateMarketingAgentOutput(
+      {
+        enabled: true,
+        baseUrl: "http://localhost:20128/v1",
+        apiKey: "",
+        model: "gpt-4.1-mini",
+        maxRetries: 0
+      },
+      {
+        role: "market-radar",
+        command: "trend",
+        topic: "AI Agent cho SME",
+        context: "Demo"
+      },
+      fetchMock
+    );
+
+    expect(output.mode).toBe("mock");
+    expect(output.fallbackReason).toContain("AI provider unavailable");
+    expect(output.text).toContain("Market Radar Bot");
+  });
+
+  it("falls back safely when the provider returns an empty response", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [] })
+    });
+
+    const output = await generateMarketingAgentOutput(
+      {
+        enabled: true,
+        baseUrl: "http://localhost:20128/v1",
+        apiKey: "",
+        model: "gpt-4.1-mini",
+        maxRetries: 0
+      },
+      {
+        role: "content-creator",
+        command: "post",
+        topic: "AI Agent cho SME"
+      },
+      fetchMock
+    );
+
+    expect(output.mode).toBe("mock");
+    expect(output.fallbackReason).toContain("empty response");
   });
 });

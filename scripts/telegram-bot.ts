@@ -3,7 +3,8 @@ import { resolve } from "node:path";
 import { seedData } from "../src/data/seed";
 import {
   createAiProviderConfig,
-  generateMarketingAgentOutput
+  generateMarketingAgentOutput,
+  type MarketingAgentOutput
 } from "../src/integrations/aiProvider";
 import {
   createTelegramSession,
@@ -14,6 +15,13 @@ import {
   type MarketingBotConfig,
   type TelegramSession
 } from "../src/integrations/telegramAdapter";
+import {
+  buildAgentHandoffContext,
+  buildRuntimeHealthFromConfig,
+  cleanTelegramText,
+  evaluateTelegramAuthorization,
+  type AgentHandoffOutput
+} from "../src/integrations/telegramRuntime";
 
 interface TelegramUpdate {
   update_id: number;
@@ -52,6 +60,7 @@ const managerCommands = new Set([
   "run",
   "approve",
   "reject",
+  "health",
   "report",
   "whoami"
 ]);
@@ -82,17 +91,6 @@ function loadDotEnv() {
       process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
     }
   }
-}
-
-function isAllowed(update: TelegramUpdate) {
-  const groupId = process.env.TELEGRAM_GROUP_ID;
-  const operatorId = process.env.OPERATOR_TELEGRAM_USER_ID;
-  const chatId = String(update.message?.chat.id ?? "");
-  const userId = String(update.message?.from?.id ?? "");
-
-  if (groupId && chatId !== groupId) return false;
-  if (operatorId && userId !== operatorId) return false;
-  return true;
 }
 
 function parseCommand(text: string) {
@@ -165,6 +163,7 @@ async function telegramApi<T>(
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
+    signal: AbortSignal.timeout(method === "getUpdates" ? 35_000 : 15_000),
     body: JSON.stringify(body)
   });
   const payload = (await response.json()) as { ok: boolean; result?: T; description?: string };
@@ -214,42 +213,35 @@ function coordinationMessage(role: string, topic: string) {
   return messages[role] ?? `Tôi nhận nhiệm vụ cho: ${topic}.`;
 }
 
-function cleanTelegramText(text: string) {
-  return text
-    .replace(/\*\*/g, "")
-    .replace(/^#{1,6}\s*/gm, "")
-    .replace(/^\s*-\s*\[\s?\]\s*/gm, "- ")
-    .replace(/`/g, "")
-    .replace(/\n{3,}/g, "\n\n")
-    .trim();
-}
-
 function newestRunId(session: TelegramSession) {
   return session.pendingApprovals[0]?.run_id;
 }
 
 function formatAiReply(
   target: MarketingBotConfig,
-  aiMode: string,
-  text: string,
+  output: MarketingAgentOutput,
   runId?: string
 ) {
   return [
     `${target.displayName} - Kết quả chuyên môn`,
-    cleanTelegramText(text),
-    runId ? `Chờ duyệt: /approve ${runId} hoặc /reject ${runId}` : "Chờ Manager kiểm tra trước khi dùng.",
-    aiMode === "ai" ? "Nguồn xử lý: 9Router AI" : "Nguồn xử lý: mô phỏng local"
-  ].join("\n\n");
+    cleanTelegramText(output.text),
+    runId
+      ? `Chờ duyệt: /approve ${runId} hoặc /reject ${runId} <lý do cần sửa>`
+      : "Chờ Manager kiểm tra trước khi dùng.",
+    output.mode === "ai" ? "Nguồn xử lý: 9Router AI" : "Nguồn xử lý: mô phỏng local an toàn",
+    output.fallbackReason ? `Ghi chú vận hành: ${output.fallbackReason}` : ""
+  ].filter(Boolean).join("\n\n");
 }
 
 async function runSpecialistDepartment(
   target: MarketingBotConfig,
   chatId: number | string,
   topic: string,
+  context: string,
   state: { session: TelegramSession }
-) {
+): Promise<MarketingAgentOutput | undefined> {
   const command = campaignAutoRuns[target.role];
-  if (!command) return;
+  if (!command) return undefined;
 
   await sendTyping(target.token, chatId);
   await wait(700);
@@ -266,15 +258,16 @@ async function runSpecialistDepartment(
     role: target.role,
     command,
     topic,
-    context: "Auto-run from Marketing Manager campaign orchestration"
+    context
   });
 
   await wait(700);
   await sendMessage(
     target.token,
     chatId,
-    formatAiReply(target, aiOutput.mode, aiOutput.text, runId)
+    formatAiReply(target, aiOutput, runId)
   );
+  return aiOutput;
 }
 
 async function pollBot(
@@ -283,99 +276,164 @@ async function pollBot(
   state: { session: TelegramSession }
 ) {
   let offset = 0;
+  let retryDelayMs = 1_000;
   console.log(`${config.displayName} is running.`);
 
   while (true) {
-    const updates = await telegramApi<TelegramUpdate[]>(config.token, "getUpdates", {
-      offset,
-      timeout: 25,
-      allowed_updates: ["message"]
-    });
+    try {
+      const updates = await telegramApi<TelegramUpdate[]>(config.token, "getUpdates", {
+        offset,
+        timeout: 25,
+        allowed_updates: ["message"]
+      });
+      retryDelayMs = 1_000;
 
-    for (const update of updates) {
-      offset = update.update_id + 1;
-      const message = update.message;
-      if (!message?.text) continue;
-      console.log(
-        JSON.stringify({
-          event: "telegram_message",
-          bot: config.role,
-          chat_id: message.chat.id,
-          chat_type: message.chat.type,
-          from_id: message.from?.id,
-          from_username: message.from?.username,
-          text: message.text.slice(0, 120)
-        })
-      );
+      for (const update of updates) {
+        offset = update.update_id + 1;
+        const message = update.message;
+        if (!message?.text) continue;
+        const parsed = parseCommand(message.text);
+        console.log(
+          JSON.stringify({
+            event: "telegram_message",
+            bot: config.role,
+            chat_id: message.chat.id,
+            chat_type: message.chat.type,
+            from_id: message.from?.id,
+            command: parsed.command
+          })
+        );
 
-      const parsed = parseCommand(message.text);
-      if (!shouldBotHandleMessage(config.role, parsed.command)) {
-        continue;
-      }
+        if (!shouldBotHandleMessage(config.role, parsed.command)) {
+          continue;
+        }
 
-      if (parsed.command === "whoami") {
-        if ((process.env.TELEGRAM_GROUP_ID || process.env.OPERATOR_TELEGRAM_USER_ID) && !isAllowed(update)) {
+        const authorization = evaluateTelegramAuthorization(process.env, {
+          chatId: String(message.chat.id),
+          userId: String(message.from?.id ?? "")
+        });
+
+        if (parsed.command === "whoami") {
+          const authorizationConfigured = Boolean(
+            process.env.TELEGRAM_GROUP_ID && process.env.OPERATOR_TELEGRAM_USER_ID
+          );
+          if (authorizationConfigured && !authorization.allowed) {
+            await sendMessage(
+              config.token,
+              message.chat.id,
+              "Command Center chỉ hiển thị thông tin khóa quyền cho group và người quản lý đã cấu hình."
+            );
+            continue;
+          }
+          await sendMessage(config.token, message.chat.id, formatWhoami(update));
+          continue;
+        }
+
+        if (!authorization.allowed) {
+          const authorizationMessage =
+            authorization.reason === "missing_configuration"
+              ? "Command Center chưa khóa quyền. Dùng /whoami, sau đó cấu hình TELEGRAM_GROUP_ID và OPERATOR_TELEGRAM_USER_ID trước khi chạy nghiệp vụ."
+              : "Command Center chỉ nhận lệnh từ group và người quản lý đã cấu hình.";
           await sendMessage(
             config.token,
             message.chat.id,
-            "Command Center chỉ hiển thị thông tin khóa quyền cho group và người quản lý đã cấu hình."
+            authorizationMessage
           );
           continue;
         }
-        await sendMessage(config.token, message.chat.id, formatWhoami(update));
-        continue;
-      }
 
-      if (!isAllowed(update)) {
-        await sendMessage(
-          config.token,
-          message.chat.id,
-          "Command Center chỉ nhận lệnh từ group và người quản lý đã cấu hình."
-        );
-        continue;
-      }
+        try {
+          const hasMarketingTeam = Boolean(process.env.TELEGRAM_MARKET_RADAR_BOT_TOKEN);
+          const routedText = normalizeMessageForRole(config.role, message.text, parsed.command);
+          const routedParsed = parseCommand(routedText);
 
-      try {
-        const hasMarketingTeam = Boolean(process.env.TELEGRAM_MARKET_RADAR_BOT_TOKEN);
-        const routedText = normalizeMessageForRole(config.role, message.text, parsed.command);
-        const routedParsed = parseCommand(routedText);
-        const result = hasMarketingTeam
-          ? handleMarketingTeamCommand(state.session, routedText, config.role)
-          : handleTelegramCommand(state.session, routedText);
-        state.session = result.session;
+          if (hasMarketingTeam && config.role === "manager" && routedParsed.command === "health") {
+            await sendMessage(
+              config.token,
+              message.chat.id,
+              buildRuntimeHealthFromConfig(allConfigs, createAiProviderConfig(process.env), process.env)
+            );
+            continue;
+          }
 
-        if (hasMarketingTeam && config.role !== "manager" && specialistCommands.has(routedParsed.command)) {
-          const runId = newestRunId(state.session);
-          const aiOutput = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
-            role: config.role,
-            command: routedParsed.command,
-            topic: routedParsed.args.join(" ").trim() || "AI Agent service for SME",
-            context: "Telegram AI Marketing Command Center demo"
-          });
-          result.messages = [formatAiReply(config, aiOutput.mode, aiOutput.text, runId)];
-        }
+          const result = hasMarketingTeam
+            ? handleMarketingTeamCommand(state.session, routedText, config.role)
+            : handleTelegramCommand(state.session, routedText);
+          state.session = result.session;
 
-        for (const reply of result.messages) {
-          await sendMessage(config.token, message.chat.id, reply);
-        }
+          if (hasMarketingTeam && config.role !== "manager" && specialistCommands.has(routedParsed.command)) {
+            const runId = newestRunId(state.session);
+            const aiOutput = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
+              role: config.role,
+              command: routedParsed.command,
+              topic: routedParsed.args.join(" ").trim() || "AI Agent service for SME",
+              context: "Yêu cầu trực tiếp trong Telegram AI Marketing Command Center"
+            });
+            result.messages = [formatAiReply(config, aiOutput, runId)];
+          }
 
-        if (hasMarketingTeam && isCampaignCommand(config.role, routedParsed.command)) {
-          const configsByRole = Object.fromEntries(
-            allConfigs.map((item) => [item.role, item])
-          ) as Record<string, MarketingBotConfig>;
-          const topic = routedParsed.args.join(" ").trim() || "AI Agent service for SME";
-          for (const handoff of getMarketingCampaignHandoffs(topic)) {
-            const target = configsByRole[handoff.role];
-            if (target) {
-              await sendMessage(target.token, message.chat.id, handoff.message);
-              await runSpecialistDepartment(target, message.chat.id, topic, state);
+          for (const reply of result.messages) {
+            await sendMessage(config.token, message.chat.id, reply);
+          }
+
+          if (hasMarketingTeam && isCampaignCommand(config.role, routedParsed.command)) {
+            const configsByRole = Object.fromEntries(
+              allConfigs.map((item) => [item.role, item])
+            ) as Record<string, MarketingBotConfig>;
+            const topic = routedParsed.args.join(" ").trim() || "AI Agent service for SME";
+            const departmentOutputs: AgentHandoffOutput[] = [];
+
+            for (const handoff of getMarketingCampaignHandoffs(topic)) {
+              const target = configsByRole[handoff.role];
+              if (target) {
+                await sendMessage(target.token, message.chat.id, handoff.message);
+                const context = [
+                  `Brief chiến dịch: ${topic}`,
+                  "Kết quả phòng ban trước:",
+                  buildAgentHandoffContext(departmentOutputs)
+                ].join("\n\n");
+                const output = await runSpecialistDepartment(
+                  target,
+                  message.chat.id,
+                  topic,
+                  context,
+                  state
+                );
+                if (output) {
+                  departmentOutputs.push({ role: handoff.role, output: output.text });
+                }
+              }
             }
           }
+        } catch (error) {
+          const errorId = `TG-${Date.now()}`;
+          console.error(
+            JSON.stringify({
+              event: "telegram_command_error",
+              error_id: errorId,
+              bot: config.role,
+              command: parsed.command,
+              detail: error instanceof Error ? error.message : "Unknown error"
+            })
+          );
+          await sendMessage(
+            config.token,
+            message.chat.id,
+            `Tạm thời chưa xử lý được lệnh. Mã theo dõi: ${errorId}. Hãy thử lại hoặc dùng /health.`
+          );
         }
-      } catch (error) {
-        const detail = error instanceof Error ? error.message : "Unknown error";
-        await sendMessage(config.token, message.chat.id, `Lệnh chưa xử lý được: ${detail}`);
       }
+    } catch (error) {
+      console.error(
+        JSON.stringify({
+          event: "telegram_poll_error",
+          bot: config.role,
+          retry_in_ms: retryDelayMs,
+          detail: error instanceof Error ? error.message : "Unknown error"
+        })
+      );
+      await wait(retryDelayMs);
+      retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
     }
   }
 }
@@ -388,7 +446,7 @@ async function poll() {
 
   console.log("AI Marketing Command Center is running.");
   console.log("Configured bots:", configs.map((config) => config.displayName).join(", "));
-  console.log("Use /brief, /campaign, /trend, /post, /review, /approve, /reject, /report.");
+  console.log("Use /health, /brief, /campaign, /trend, /post, /review, /approve, /reject, /report.");
 
   await Promise.all(configs.map((config) => pollBot(config, configs, state)));
 }

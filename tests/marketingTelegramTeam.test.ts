@@ -47,6 +47,7 @@ describe("Marketing Telegram team adapter", () => {
       "run",
       "approve",
       "reject",
+      "health",
       "whoami",
       "report"
     ]);
@@ -135,5 +136,30 @@ describe("Marketing Telegram team adapter", () => {
     const approved = handleMarketingTeamCommand(content.session, `/approve ${runId}`, "manager");
     expect(approved.session.pendingApprovals).toHaveLength(0);
     expect(approved.messages.join("\n")).toContain("Đã phê duyệt");
+  });
+
+  it("requires a rejection reason and records it as task evidence", () => {
+    const session = createTelegramSession(seedData);
+    const content = handleMarketingTeamCommand(
+      session,
+      "/post viet bai Facebook ra mat AI Agent",
+      "content-creator"
+    );
+    const runId = content.session.pendingApprovals[0].run_id;
+
+    const missingReason = handleMarketingTeamCommand(content.session, `/reject ${runId}`, "manager");
+    expect(missingReason.session.pendingApprovals).toHaveLength(1);
+    expect(missingReason.messages.join("\n")).toContain("lý do");
+
+    const rejected = handleMarketingTeamCommand(
+      content.session,
+      `/reject ${runId} CTA chưa rõ`,
+      "manager"
+    );
+    const task = rejected.session.data.tasks.find(
+      (item) => item.id === content.session.pendingApprovals[0].task_id
+    );
+    expect(rejected.session.pendingApprovals).toHaveLength(0);
+    expect(task?.evidence).toContain("CTA chưa rõ");
   });
 });

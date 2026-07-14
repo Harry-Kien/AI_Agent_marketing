@@ -78,7 +78,7 @@ const marketingBotProfiles: Record<
     displayName: "Marketing Manager Bot",
     envKey: "TELEGRAM_MANAGER_BOT_TOKEN",
     agentId: "agent-pm",
-    commands: ["brief", "flow", "campaign", "tasks", "run", "approve", "reject", "report", "whoami", "help"],
+    commands: ["brief", "flow", "campaign", "tasks", "run", "approve", "reject", "health", "report", "whoami", "help"],
     shortDescription: "Trưởng phòng marketing AI, điều phối chiến dịch và phê duyệt.",
     description:
       "Trưởng phòng AI Marketing Command Center. Tạo chiến dịch, giao việc cho các bot chuyên môn, theo dõi tiến độ và giữ cổng phê duyệt của con người trước khi đăng, chạy chiến dịch hoặc chi tiền."
@@ -126,6 +126,7 @@ const marketingCommandMenus: Record<MarketingBotRole, TelegramBotCommand[]> = {
     { command: "run", description: "Chạy workflow cho task có sẵn" },
     { command: "approve", description: "Phê duyệt output đang chờ" },
     { command: "reject", description: "Từ chối output đang chờ" },
+    { command: "health", description: "Kiểm tra tình trạng hệ thống" },
     { command: "whoami", description: "Xem Group ID và User ID để khóa quyền" },
     { command: "report", description: "Xem báo cáo chiến dịch" }
   ],
@@ -182,6 +183,7 @@ const managerOnlyCommands = new Set([
   "run",
   "approve",
   "reject",
+  "health",
   "newtask",
   "repos",
   "export",
@@ -367,6 +369,7 @@ export function handleMarketingTeamCommand(
     if (parsed.command === "flow") return marketingFlow(session);
     if (parsed.command === "campaign") return createMarketingCampaign(session, parsed);
     if (parsed.command === "report") return marketingReport(session);
+    if (parsed.command === "health") return marketingSessionHealth(session);
     return handleTelegramCommand(session, text);
   }
 
@@ -617,12 +620,36 @@ function reject(session: TelegramSession, parsed: TelegramCommand): TelegramComm
     return { session, messages: ["Không có output nào đang chờ duyệt với run id này."] };
   }
 
+  const reason = parsed.args.slice(1).join(" ").trim();
+  if (!reason) {
+    return {
+      session,
+      messages: [`Cần ghi rõ lý do từ chối. Cách dùng: /reject ${approval.run_id} <lý do cần sửa>`]
+    };
+  }
+
+  const updatedTasks = session.data.tasks.map((task) => {
+    if (task.id !== approval.task_id) return task;
+    const rejectionEvidence = `Telegram rejection ${approval.run_id}: ${reason}`;
+    return {
+      ...task,
+      evidence: [task.evidence, rejectionEvidence].filter(Boolean).join("\n"),
+      updated_at: today()
+    };
+  });
+
   return {
     session: {
       ...session,
+      data: {
+        ...session.data,
+        tasks: updatedTasks
+      },
       pendingApprovals: session.pendingApprovals.filter((item) => item.run_id !== runId)
     },
-    messages: [`Đã từ chối ${approval.run_id}. ${approval.task_id} không bị thay đổi.`]
+    messages: [
+      `Đã từ chối ${approval.run_id}. ${approval.task_id} giữ nguyên trạng thái và đã lưu lý do: ${reason}`
+    ]
   };
 }
 
@@ -725,6 +752,20 @@ function marketingReport(session: TelegramSession): TelegramCommandResult {
         `Task chiến dịch: ${marketingTasks.length}`,
         `Output đang chờ duyệt: ${session.pendingApprovals.length}`,
         ...marketingTasks.slice(0, 5).map((task) => `- ${task.id} | ${task.status} | ${task.title}`)
+      ].join("\n")
+    ]
+  };
+}
+
+function marketingSessionHealth(session: TelegramSession): TelegramCommandResult {
+  return {
+    session,
+    messages: [
+      [
+        "Tình trạng phiên Marketing",
+        `Task đang quản lý: ${session.data.tasks.length}`,
+        `Output chờ phê duyệt: ${session.pendingApprovals.length}`,
+        "Dùng /health trực tiếp trên bot đang chạy để xem tình trạng Telegram và AI Provider."
       ].join("\n")
     ]
   };

@@ -5,6 +5,8 @@ export interface AiProviderConfig {
   baseUrl: string;
   apiKey: string;
   model: string;
+  timeoutMs?: number;
+  maxRetries?: number;
 }
 
 export interface MarketingPromptInput {
@@ -22,6 +24,7 @@ export interface MarketingPrompt {
 export interface MarketingAgentOutput {
   mode: "ai" | "mock";
   text: string;
+  fallbackReason?: string;
 }
 
 type EnvLike = Record<string, string | undefined>;
@@ -29,6 +32,8 @@ type FetchLike = typeof fetch;
 
 const defaultBaseUrl = "https://api.9router.com/v1";
 const defaultModel = "openai/gpt-4.1-mini";
+const defaultTimeoutMs = 30_000;
+const defaultMaxRetries = 1;
 const roleBoundaries: Record<MarketingBotRole, string> = {
   manager:
     "Chỉ điều phối, ưu tiên, giao việc, tổng hợp và yêu cầu phê duyệt. Không viết thay toàn bộ nội dung chuyên môn của phòng ban.",
@@ -108,7 +113,9 @@ export function createAiProviderConfig(env: EnvLike): AiProviderConfig {
     enabled: Boolean(apiKey) || forceEnabled,
     baseUrl: (env.NINE_ROUTER_BASE_URL ?? env.NINEROUTER_BASE_URL ?? defaultBaseUrl).replace(/\/$/, ""),
     apiKey,
-    model: env.NINE_ROUTER_MODEL ?? env.NINEROUTER_MODEL ?? defaultModel
+    model: env.NINE_ROUTER_MODEL ?? env.NINEROUTER_MODEL ?? defaultModel,
+    timeoutMs: readPositiveInteger(env.NINE_ROUTER_TIMEOUT_MS, defaultTimeoutMs),
+    maxRetries: readNonNegativeInteger(env.NINE_ROUTER_MAX_RETRIES, defaultMaxRetries)
   };
 }
 
@@ -131,7 +138,7 @@ export function buildMarketingPrompt(input: MarketingPromptInput): MarketingProm
     user: [
       `Lệnh: /${input.command}`,
       `Chủ đề: ${input.topic}`,
-      `Bối cảnh: ${input.context ?? "Demo Telegram local trước khi tích hợp Lark."}`,
+      `Bối cảnh: ${input.context ?? "AI Marketing Command Center vận hành qua Telegram."}`,
       "Bắt buộc có đúng 5 mục: Tóm tắt, Đề xuất, Cần kiểm tra, Rủi ro, Chờ duyệt.",
       "Không viết chung chung. Mỗi ý phải giúp người quản lý ra quyết định hoặc chuyển bước tiếp theo.",
       "Mỗi mục tối đa 2-3 bullet. Không dùng ký tự Markdown trang trí.",
@@ -160,33 +167,76 @@ export async function generateMarketingAgentOutput(
     headers.authorization = `Bearer ${config.apiKey}`;
   }
 
-  const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
-    method: "POST",
-    headers,
-    body: JSON.stringify({
-      model: config.model,
-      messages: [
-        { role: "system", content: prompt.system },
-        { role: "user", content: prompt.user }
-      ],
-      temperature: 0.35,
-      max_tokens: 650
-    })
-  });
+  const maxRetries = config.maxRetries ?? defaultMaxRetries;
+  let lastError = "AI provider unavailable";
 
-  if (!response.ok) {
-    throw new Error(`AI provider request failed with status ${response.status}`);
+  for (let attempt = 0; attempt <= maxRetries; attempt += 1) {
+    try {
+      const response = await fetchImpl(`${config.baseUrl}/chat/completions`, {
+        method: "POST",
+        headers,
+        signal: AbortSignal.timeout(config.timeoutMs ?? defaultTimeoutMs),
+        body: JSON.stringify({
+          model: config.model,
+          messages: [
+            { role: "system", content: prompt.system },
+            { role: "user", content: prompt.user }
+          ],
+          temperature: 0.35,
+          max_tokens: 650
+        })
+      });
+
+      if (!response.ok) {
+        throw new Error(`AI provider unavailable: HTTP ${response.status}`);
+      }
+
+      const payload = (await response.json()) as {
+        choices?: Array<{ message?: { content?: string } }>;
+      };
+      const text = payload.choices?.[0]?.message?.content?.trim();
+      if (!text) {
+        throw new Error("AI provider returned an empty response");
+      }
+
+      return { mode: "ai", text };
+    } catch (error) {
+      lastError = normalizeProviderError(error);
+      if (attempt < maxRetries) {
+        await waitForRetry(400 * (attempt + 1));
+      }
+    }
   }
 
-  const payload = (await response.json()) as {
-    choices?: Array<{ message?: { content?: string } }>;
+  return {
+    mode: "mock",
+    text: buildMockOutput(input),
+    fallbackReason: lastError
   };
-  const text = payload.choices?.[0]?.message?.content?.trim();
-  if (!text) {
-    throw new Error("AI provider returned an empty response.");
-  }
+}
 
-  return { mode: "ai", text };
+function normalizeProviderError(error: unknown) {
+  const message = error instanceof Error ? error.message : "unknown error";
+  if (message.includes("empty response")) return message;
+  if (message.includes("AI provider unavailable")) return message;
+  if (message.toLowerCase().includes("abort") || message.toLowerCase().includes("timeout")) {
+    return "AI provider unavailable: request timeout";
+  }
+  return "AI provider unavailable: connection error";
+}
+
+function waitForRetry(ms: number) {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function readPositiveInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed > 0 ? parsed : fallback;
+}
+
+function readNonNegativeInteger(value: string | undefined, fallback: number) {
+  const parsed = Number(value);
+  return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
 function buildMockOutput(input: MarketingPromptInput) {

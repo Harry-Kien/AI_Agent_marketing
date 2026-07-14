@@ -29,6 +29,7 @@ async function telegramApi<T>(
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
+    signal: AbortSignal.timeout(15_000),
     body: JSON.stringify(body)
   });
   const payload = (await response.json()) as { ok: boolean; result?: T; description?: string };
@@ -39,6 +40,9 @@ async function telegramApi<T>(
 }
 
 async function setupBot(config: MarketingBotConfig) {
+  await telegramApi(config.token, "deleteWebhook", {
+    drop_pending_updates: false
+  });
   const me = await telegramApi<{ username: string; first_name: string }>(config.token, "getMe");
   const menus = getMarketingBotCommandMenus();
   await telegramApi(config.token, "setMyName", {

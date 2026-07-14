@@ -96,11 +96,12 @@ describe("Telegram-first manager bot adapter", () => {
     const session = createTelegramSession(seedData);
     const runResult = handleTelegramCommand(session, "/agent spec task-003");
     const runId = runResult.session.pendingApprovals[0].run_id;
-    const rejected = handleTelegramCommand(runResult.session, `/reject ${runId}`);
+    const rejected = handleTelegramCommand(runResult.session, `/reject ${runId} Spec chưa đủ bằng chứng`);
 
     const task = rejected.session.data.tasks.find((item) => item.id === "task-003");
     expect(task?.status).toBe("spec");
     expect(rejected.session.pendingApprovals).toHaveLength(0);
     expect(rejected.messages.join("\n")).toContain("Đã từ chối");
+    expect(task?.evidence).toContain("Spec chưa đủ bằng chứng");
   });
 });

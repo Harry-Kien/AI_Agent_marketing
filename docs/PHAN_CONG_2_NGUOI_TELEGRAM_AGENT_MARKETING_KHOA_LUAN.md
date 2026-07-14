@@ -91,7 +91,7 @@ Người quản lý
 9. Manager Bot phân công cho Performance Brand Bot.
 10. Performance Brand Bot gọi AI để review chất lượng/KPI.
 11. Mỗi output tạo một `RUN_ID`.
-12. Người quản lý dùng `/approve RUN_ID` hoặc `/reject RUN_ID`.
+12. Người quản lý dùng `/approve RUN_ID` hoặc `/reject RUN_ID <lý do cần sửa>`.
 13. Dashboard cập nhật trạng thái task/campaign.
 14. Kết quả được đưa vào báo cáo demo.
 
@@ -183,7 +183,7 @@ sequenceDiagram
     participant Store as Runtime State
     participant Manager as Marketing Manager Bot
 
-    Owner->>TG: /reject RUN_ID
+    Owner->>TG: /reject RUN_ID CTA chưa rõ
     TG->>Orchestrator: Nhận lệnh reject
     Orchestrator->>Orchestrator: Kiểm tra quyền người gửi
     Orchestrator->>Store: Tìm pending approval
@@ -241,10 +241,12 @@ Bạn phụ trách toàn bộ phần vận hành bot Telegram và logic AI Agent
 scripts/telegram-bot.ts
 scripts/telegram-setup.ts
 src/integrations/telegramAdapter.ts
+src/integrations/telegramRuntime.ts
 src/integrations/aiProvider.ts
 tests/telegramAdapter.test.ts
 tests/marketingTelegramTeam.test.ts
 tests/aiProvider.test.ts
+tests/telegramRuntime.test.ts
 ```
 
 ### Công việc chi tiết của bạn
@@ -266,17 +268,19 @@ tests/aiProvider.test.ts
 
 ### Checklist riêng của bạn
 
-- [ ] `.env.example` đủ biến Telegram/9Router.
-- [ ] `.env` local có token thật nhưng không commit.
-- [ ] `npm run telegram:setup` chạy được.
-- [ ] `npm run telegram:bot` chạy được.
-- [ ] `/brief` trả lời đúng.
-- [ ] `/campaign` tạo campaign và auto-run bot.
-- [ ] `/trend`, `/post`, `/review` gọi đúng bot.
-- [ ] `/approve RUN_ID` hoạt động.
-- [ ] `/reject RUN_ID` hoạt động.
-- [ ] Output sạch và chuyên nghiệp.
-- [ ] Test liên quan Telegram/AI pass.
+- [x] `.env.example` đủ biến Telegram/9Router.
+- [x] `.env` local có token thật nhưng không commit.
+- [x] `npm run telegram:setup` chạy được.
+- [x] Marketing Manager Bot được hướng dẫn tắt Privacy Mode để nhận yêu cầu tự nhiên trong group.
+- [x] `npm run telegram:bot` khởi động đủ 4 bot.
+- [x] `/brief` có handler và test.
+- [x] `/campaign` tạo campaign và auto-run bot tuần tự.
+- [x] `/trend`, `/post`, `/review` gọi đúng bot.
+- [x] `/approve RUN_ID` hoạt động.
+- [x] `/reject RUN_ID <lý do>` hoạt động và lưu evidence.
+- [x] `/health` báo bot, AI provider và khóa quyền.
+- [x] Output được làm sạch và có fallback rõ ràng.
+- [x] Test liên quan Telegram/AI pass.
 
 ## 8.2. Bạn còn lại: phụ trách Dashboard, Data Model và tài liệu
 
@@ -429,6 +433,8 @@ NINE_ROUTER_ENABLED=true
 NINE_ROUTER_BASE_URL=http://localhost:20128/v1
 NINE_ROUTER_MODEL=cx/gpt-5.4-mini
 NINE_ROUTER_API_KEY=
+NINE_ROUTER_TIMEOUT_MS=30000
+NINE_ROUTER_MAX_RETRIES=1
 ```
 
 Bạn còn lại nếu không chạy bot thì chưa cần token Telegram. Nếu bạn còn lại cần test bot, bạn có thể chia sẻ riêng file `.env` qua kênh an toàn, không đưa lên GitHub.
