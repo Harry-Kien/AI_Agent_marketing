@@ -58,6 +58,9 @@ describe("Marketing Telegram team adapter", () => {
       "approve",
       "reject",
       "revise",
+      "schedule",
+      "confirm",
+      "community",
       "health",
       "whoami",
       "report"

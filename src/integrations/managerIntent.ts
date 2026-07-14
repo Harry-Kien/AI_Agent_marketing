@@ -99,6 +99,8 @@ export function intentToFallbackCommand(decision: IntentDecision) {
     case "reject": return `/reject ${decision.runId} ${decision.reason ?? ""}`.trim();
     case "revise": return `/revise ${decision.runId} ${decision.reason ?? ""}`.trim();
     case "community_inbox": return "/community";
+    case "schedule": return decision.campaignId ? `/schedule ${decision.campaignId}` : "/schedule";
+    case "confirm_publish": return decision.campaignId ? `/confirm ${decision.campaignId}` : "/confirm";
     case "help": return "/help";
     default: return undefined;
   }

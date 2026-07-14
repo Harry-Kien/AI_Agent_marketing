@@ -8,12 +8,15 @@ import {
 } from "../src/integrations/aiProvider";
 import {
   approveRun,
+  completePublication,
   completeRun,
+  confirmPublication,
   createCampaign,
   createEmptyWorkflowState,
   getCampaignTimeline,
   listPendingRuns,
   rejectRun,
+  requestPublicationConfirmation,
   reviseRun,
   type MarketingAgentRunRuntime,
   type MarketingCampaignRuntime
@@ -41,6 +44,7 @@ import {
   type TelegramRuntimeSnapshot
 } from "../src/integrations/telegramStateStore";
 import { intentToFallbackCommand, resolveManagerIntent } from "../src/integrations/managerIntent";
+import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
 
 interface TelegramUpdate {
   update_id: number;
@@ -69,7 +73,7 @@ const specialistCommands = new Set([
 const managerCommands = new Set([
   "start", "help", "brief", "flow", "campaign", "campaigns", "status",
   "approvals", "audit", "approve", "reject", "revise", "tasks", "run",
-  "health", "report", "whoami"
+  "schedule", "confirm", "community", "health", "report", "whoami"
 ]);
 
 const roleCommands: Record<MarketingBotRole, Set<string>> = {
@@ -82,7 +86,7 @@ const roleCommands: Record<MarketingBotRole, Set<string>> = {
 };
 
 const workflowCommands = new Set([
-  "campaign", "campaigns", "status", "approvals", "audit", "approve", "reject", "revise", "report"
+  "campaign", "campaigns", "status", "approvals", "audit", "approve", "reject", "revise", "schedule", "confirm", "community", "report"
 ]);
 
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -297,10 +301,17 @@ async function runWorkflowStage(
   if (!run || run.status !== "running") return;
   const campaign = controller.snapshot.workflow.campaigns.find((item) => item.id === run.campaignId);
   if (!campaign) throw new Error(`Campaign ${run.campaignId} does not exist.`);
-  const target = configs.find((item) => item.role === run.role);
+  let target = configs.find((item) => item.role === run.role);
   if (!target) throw new Error(`Bot for role ${run.role} is not configured.`);
 
-  await sendTyping(target.token, chatId);
+  try {
+    await sendTyping(target.token, chatId);
+  } catch {
+    const manager = configs.find((item) => item.role === "manager");
+    if (!manager) throw new Error(`Bot for role ${run.role} is unavailable.`);
+    target = manager;
+    await sendMessage(manager.token, chatId, `Kênh ${roleLabel(run.role)} đang lỗi xác thực. Manager chuyển tiếp nhiệm vụ có ghi vết để workflow không bị gián đoạn.`);
+  }
   await sendMessage(target.token, chatId, [
     `${roleLabel(run.role)} đã nhận nhiệm vụ ${stageLabel(run.stage)}.`,
     `Campaign: ${campaign.id}`,
@@ -361,7 +372,7 @@ async function handleWorkflowCommand(
     });
     await sendMessage(manager.token, chatId, [
       `Đã mở chiến dịch ${created.campaign.id}.`,
-      "Quy trình Stage-Gate: Research → duyệt → Content → duyệt → Brand & KPI → duyệt → Final → duyệt.",
+      "Quy trình Stage-Gate: Research → duyệt → Content Strategy → duyệt → Creative → duyệt → Brand & KPI → duyệt → Final → duyệt.",
       `Market Radar đang nhận run ${created.run.id}.`
     ].join("\n"));
     await runWorkflowStage(created.run.id, chatId, configs, controller);
@@ -375,6 +386,54 @@ async function handleWorkflowCommand(
 
   if (parsed.command === "approvals") {
     await sendMessage(manager.token, chatId, formatApprovals(controller.snapshot));
+    return;
+  }
+
+  if (parsed.command === "community") {
+    await sendMessage(manager.token, chatId, "Hàng chờ cộng đồng hiện chưa có tương tác mới. Auto-reply đang tắt; giá, khiếu nại và dữ liệu cá nhân luôn chuyển cho người quản lý.");
+    return;
+  }
+
+  if (parsed.command === "schedule") {
+    const campaigns = controller.snapshot.workflow.campaigns;
+    const requestedId = parsed.args[0];
+    const campaign = requestedId ? campaigns.find((item) => item.id === requestedId) : campaigns[campaigns.length - 1];
+    if (!campaign) { await sendMessage(manager.token, chatId, "Không tìm thấy chiến dịch để chuẩn bị đăng."); return; }
+    const preview = await mutateRuntime(controller, (snapshot) => {
+      const result = requestPublicationConfirmation(snapshot.workflow, campaign.id, actorId);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
+    });
+    const growth = configs.find((item) => item.role === "page-growth") ?? manager;
+    await sendMessage(growth.token, chatId, [
+      `PAGE GROWTH - BẢN XEM TRƯỚC ${preview.id}`,
+      preview.publicationPreview ?? preview.brief,
+      "Trạng thái: chờ xác nhận xuất bản lần cuối.",
+      `Bạn có thể nhắn: Xác nhận đăng ${preview.id}`
+    ].join("\n"));
+    return;
+  }
+
+  if (parsed.command === "confirm") {
+    const campaigns = controller.snapshot.workflow.campaigns;
+    const requestedId = parsed.args[0];
+    const campaign = requestedId ? campaigns.find((item) => item.id === requestedId) : campaigns[campaigns.length - 1];
+    if (!campaign) { await sendMessage(manager.token, chatId, "Không tìm thấy chiến dịch cần xác nhận."); return; }
+    const metaConfig = createMetaGraphConfig(process.env);
+    if (!metaConfig.publishEnabled) {
+      await sendMessage(manager.token, chatId, "Đã ghi nhận ý định xác nhận, nhưng Meta publish đang khóa an toàn. Hãy thay token đã lộ và bật META_PUBLISH_ENABLED=true sau khi kiểm tra quyền App.");
+      return;
+    }
+    const confirmed = await mutateRuntime(controller, (snapshot) => {
+      const result = confirmPublication(snapshot.workflow, campaign.id, actorId);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
+    });
+    const message = confirmed.publicationPreview?.replace(/^Bản xem trước xuất bản:\s*/, "") ?? confirmed.brief;
+    const evidence = await createMetaGraphClient(metaConfig).publish({ message, confirmationText: message, approvalId: `${confirmed.id}:${actorId}` });
+    await mutateRuntime(controller, (snapshot) => {
+      const result = completePublication(snapshot.workflow, confirmed.id, evidence);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
+    });
+    await sendMessage(manager.token, chatId, `Đã xuất bản có bằng chứng: ${evidence.postId}`);
     return;
   }
 

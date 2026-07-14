@@ -56,7 +56,7 @@ const navItems = [
   { id: "agents" as View, label: "Agents", icon: Bot },
   { id: "brief" as View, label: "Daily Brief", icon: BriefcaseBusiness },
   { id: "telegram" as View, label: "Telegram", icon: Send },
-  { id: "export" as View, label: "Lark Export", icon: FileJson }
+  { id: "export" as View, label: "Data Export", icon: FileJson }
 ];
 
 function loadInitialData(): AppData {
@@ -557,7 +557,7 @@ function App() {
           <div className="brief-detail">
             <h3>Demo operating model</h3>
             <p className="note">
-              Telegram is the fast command surface. Four marketing bots work like a small digital department: one manager, one market radar, one content creator, and one performance brand reviewer. The dashboard remains the local operating board, and Lark can replace or mirror this layer later.
+              Telegram là kênh điều hành. Sáu Agent chuyên môn phối hợp theo stage-gate, còn dashboard là bảng quan sát, phê duyệt và kiểm toán local.
             </p>
             <div className="export-grid">
               <article className="export-card">
@@ -578,12 +578,12 @@ function App() {
               <article className="export-card">
                 <span>Runtime</span>
                 <strong>Local first</strong>
-                <p>Long polling, no webhook or Lark credentials required.</p>
+                <p>Long polling, không cần webhook cho bản chạy local.</p>
               </article>
               <article className="export-card">
                 <span>Upgrade</span>
-                <strong>Lark-ready</strong>
-                <p>Export data can later become Lark Base sync.</p>
+                <strong>API-ready</strong>
+                <p>JSON/CSV và Control API sẵn sàng cho tích hợp tiếp theo.</p>
               </article>
             </div>
           </div>
@@ -624,7 +624,7 @@ function App() {
 
   const renderExport = () => (
     <section className="view-grid">
-      <Panel title="Lark Export / Integration Placeholder" icon={<Download size={18} />}>
+      <Panel title="Data Export / Integration" icon={<Download size={18} />}>
         <div className="export-grid">
           {Object.entries(exported.json).map(([table, rows]) => (
             <article className="export-card" key={table}>
@@ -643,7 +643,7 @@ function App() {
           </Panel>
           <Panel title="Integration note" icon={<ShieldCheck size={18} />}>
             <p className="note">
-              MVP hiện chỉ export JSON/CSV. Module <code>larkAdapter.ts</code> đã tách riêng để sau này thay bằng Lark Base OpenAPI khi có tenant credentials, base ID, table ID và approval flow.
+              Hệ thống export JSON/CSV để lưu trữ, báo cáo hoặc nối sang dịch vụ ngoài. Luồng Telegram và Meta không phụ thuộc nền tảng quản trị khác.
             </p>
           </Panel>
         </div>

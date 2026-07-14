@@ -324,9 +324,13 @@ main { padding: 1.2rem; overflow: hidden; }
 
 @media (max-width: 680px) {
   main { padding: 0.8rem; }
-  .sidebar nav, .metric-grid, .filters, .form-grid, .detail-grid, .schema-grid, .export-grid {
+  .metric-grid, .filters, .form-grid, .detail-grid, .schema-grid, .export-grid {
     grid-template-columns: 1fr;
   }
+  .sidebar { padding: 0.8rem; }
+  .brand { margin-bottom: 0.7rem; }
+  .sidebar nav { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0.25rem; }
+  .sidebar button { min-height: 38px; padding: 0.42rem 0.5rem; font-size: 0.78rem; }
   .topbar { align-items: stretch; flex-direction: column; }
   .hero-panel h1 { font-size: 1.7rem; }
   .health-row, .task-row { grid-template-columns: 1fr; }
