@@ -75,4 +75,4 @@
 - [x] Chạy `npm run typecheck`.
 - [x] Chạy `npm run build`.
 - [x] Quét secret và kiểm tra staged diff.
-- [ ] Commit Conventional Commit và push feature branch.
+- [x] Commit Conventional Commit và push feature branch.
