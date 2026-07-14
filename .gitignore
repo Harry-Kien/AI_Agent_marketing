@@ -4,6 +4,8 @@ dist
 .worktrees
 coverage
 output
+.serena/
+Tai_lieu_MVP_Lark_Repo_Agent_Command_Center.docx
 *.tsbuildinfo
 .env
 .env.local
