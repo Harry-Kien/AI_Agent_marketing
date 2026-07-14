@@ -302,7 +302,12 @@ async function runWorkflowStage(
   const campaign = controller.snapshot.workflow.campaigns.find((item) => item.id === run.campaignId);
   if (!campaign) throw new Error(`Campaign ${run.campaignId} does not exist.`);
   let target = configs.find((item) => item.role === run.role);
-  if (!target) throw new Error(`Bot for role ${run.role} is not configured.`);
+  if (!target) {
+    const manager = configs.find((item) => item.role === "manager");
+    if (!manager) throw new Error(`Bot for role ${run.role} is unavailable.`);
+    target = manager;
+    await sendMessage(manager.token, chatId, `Kênh ${roleLabel(run.role)} chưa xác thực. Manager chuyển tiếp nhiệm vụ có ghi vết để workflow không bị gián đoạn.`);
+  }
 
   try {
     await sendTyping(target.token, chatId);
@@ -695,7 +700,18 @@ async function pollBot(
 
 async function poll() {
   loadDotEnv();
-  const configs = getBotConfigs();
+  const configuredBots = getBotConfigs();
+  const checks = await Promise.all(configuredBots.map(async (config) => {
+    try {
+      await telegramApi(config.token, "getMe", {});
+      return { config, available: true };
+    } catch (error) {
+      console.error(JSON.stringify({ event: "telegram_bot_unavailable", bot: config.role, detail: error instanceof Error ? error.message : "Unknown error" }));
+      return { config, available: false };
+    }
+  }));
+  const configs = checks.filter((check) => check.available).map((check) => check.config);
+  if (!configs.some((config) => config.role === "manager")) throw new Error("Marketing Manager Bot must be available.");
   const statePath = resolve(process.env.TELEGRAM_RUNTIME_STATE_PATH ?? "output/telegram-runtime-state.json");
   const fallback = () => createRuntimeSnapshot({
     telegramSession: createTelegramSession(seedData),
@@ -710,7 +726,9 @@ async function poll() {
   await saveRuntimeSnapshot(statePath, controller.snapshot);
 
   console.log("AI Marketing Command Center Enterprise Stage-Gate is running.");
-  console.log("Configured bots:", configs.map((config) => config.displayName).join(", "));
+  console.log("Active bots:", configs.map((config) => config.displayName).join(", "));
+  const unavailable = checks.filter((check) => !check.available).map((check) => check.config.displayName);
+  if (unavailable.length) console.log("Manager relay enabled for:", unavailable.join(", "));
   console.log(`Runtime state: ${statePath}${loaded.recovered ? " (recovered from corrupt snapshot)" : ""}`);
   console.log("Use /campaign, /campaigns, /status, /approvals, /approve, /reject, /revise, /audit, /health.");
   await Promise.all(configs.map((config) => pollBot(config, configs, controller)));
