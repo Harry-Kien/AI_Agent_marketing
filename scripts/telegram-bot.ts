@@ -7,21 +7,39 @@ import {
   type MarketingAgentOutput
 } from "../src/integrations/aiProvider";
 import {
+  approveRun,
+  completeRun,
+  createCampaign,
+  createEmptyWorkflowState,
+  getCampaignTimeline,
+  listPendingRuns,
+  rejectRun,
+  reviseRun,
+  type MarketingAgentRunRuntime,
+  type MarketingCampaignRuntime
+} from "../src/integrations/marketingWorkflow";
+import {
   createTelegramSession,
-  getMarketingCampaignHandoffs,
   getMarketingBotConfigsFromEnv,
   handleMarketingTeamCommand,
   handleTelegramCommand,
   type MarketingBotConfig,
-  type TelegramSession
+  type MarketingBotRole
 } from "../src/integrations/telegramAdapter";
 import {
-  buildAgentHandoffContext,
   buildRuntimeHealthFromConfig,
   cleanTelegramText,
-  evaluateTelegramAuthorization,
-  type AgentHandoffOutput
+  evaluateTelegramAuthorization
 } from "../src/integrations/telegramRuntime";
+import {
+  addProcessedUpdate,
+  createRuntimeSnapshot,
+  hasProcessedUpdate,
+  loadRuntimeSnapshot,
+  saveRuntimeSnapshot,
+  setBotOffset,
+  type TelegramRuntimeSnapshot
+} from "../src/integrations/telegramStateStore";
 
 interface TelegramUpdate {
   update_id: number;
@@ -33,63 +51,57 @@ interface TelegramUpdate {
   };
 }
 
+interface RuntimeController {
+  snapshot: TelegramRuntimeSnapshot;
+  statePath: string;
+  mutationQueue: Promise<void>;
+}
+
 const specialistCommands = new Set([
-  "trend",
-  "competitor",
-  "audience",
-  "insight",
-  "angle",
-  "post",
-  "caption",
-  "script",
-  "calendar",
-  "hook",
-  "review",
-  "brandcheck",
-  "cta",
-  "measure"
+  "trend", "competitor", "audience", "insight", "angle",
+  "post", "caption", "script", "calendar", "hook",
+  "review", "brandcheck", "cta", "measure"
 ]);
 
 const managerCommands = new Set([
-  "start",
-  "help",
-  "brief",
-  "flow",
-  "campaign",
-  "tasks",
-  "run",
-  "approve",
-  "reject",
-  "health",
-  "report",
-  "whoami"
+  "start", "help", "brief", "flow", "campaign", "campaigns", "status",
+  "approvals", "audit", "approve", "reject", "revise", "tasks", "run",
+  "health", "report", "whoami"
 ]);
 
-const roleCommands: Record<string, Set<string>> = {
+const roleCommands: Record<MarketingBotRole, Set<string>> = {
   manager: managerCommands,
   "market-radar": new Set(["start", "help", "trend", "competitor", "audience", "insight", "angle", "whoami"]),
   "content-creator": new Set(["start", "help", "post", "caption", "script", "calendar", "hook", "whoami"]),
   "performance-brand": new Set(["start", "help", "review", "brandcheck", "cta", "measure", "report", "whoami"])
 };
 
-const campaignAutoRuns: Record<string, string> = {
-  "market-radar": "trend",
-  "content-creator": "post",
-  "performance-brand": "review"
+const workflowCommands = new Set([
+  "campaign", "campaigns", "status", "approvals", "audit", "approve", "reject", "revise", "report"
+]);
+
+const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
+  research: "trend",
+  content: "post",
+  brand: "review",
+  final: "finalize"
+};
+
+const roleUpdatePrefixes: Record<MarketingBotRole, number> = {
+  manager: 1,
+  "market-radar": 2,
+  "content-creator": 3,
+  "performance-brand": 4
 };
 
 function loadDotEnv() {
   const envPath = resolve(process.cwd(), ".env");
   if (!existsSync(envPath)) return;
-
-  const lines = readFileSync(envPath, "utf8").split(/\r?\n/);
-  for (const line of lines) {
+  for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
     const trimmed = line.trim();
     if (!trimmed || trimmed.startsWith("#") || !trimmed.includes("=")) continue;
     const [key, ...valueParts] = trimmed.split("=");
-    if (!process.env[key]) {
-      process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
-    }
+    if (!process.env[key]) process.env[key] = valueParts.join("=").replace(/^["']|["']$/g, "");
   }
 }
 
@@ -97,39 +109,16 @@ function parseCommand(text: string) {
   const raw = text.trim();
   if (!raw.startsWith("/")) return { command: "natural", args: [raw] };
   const [head = "", ...args] = raw.split(/\s+/).filter(Boolean);
-  return {
-    command: head.replace(/^\//, "").split("@")[0].toLowerCase(),
-    args
-  };
+  return { command: head.replace(/^\//, "").split("@")[0].toLowerCase(), args };
 }
 
-function shouldBotHandleMessage(role: string, command: string) {
+function shouldBotHandleMessage(role: MarketingBotRole, command: string) {
   if (command === "natural") return role === "manager";
-  return roleCommands[role]?.has(command) ?? false;
+  return roleCommands[role].has(command);
 }
 
-function normalizeMessageForRole(role: string, text: string, command: string) {
-  if (role === "manager" && command === "natural") {
-    return `/campaign ${text.trim()}`;
-  }
-  return text;
-}
-
-function formatWhoami(update: TelegramUpdate) {
-  const chat = update.message?.chat;
-  const from = update.message?.from;
-  return [
-    "Thông tin khóa quyền Telegram",
-    `TELEGRAM_GROUP_ID=${chat?.id ?? ""}`,
-    `OPERATOR_TELEGRAM_USER_ID=${from?.id ?? ""}`,
-    `Chat type: ${chat?.type ?? "unknown"}`,
-    `Username: ${from?.username ? `@${from.username}` : "unknown"}`,
-    "Hai giá trị này dùng để khóa đúng group và đúng người quản lý được phê duyệt."
-  ].join("\n");
-}
-
-function isCampaignCommand(role: string, command: string) {
-  return role === "manager" && command === "campaign";
+function normalizeMessageForRole(role: MarketingBotRole, text: string, command: string) {
+  return role === "manager" && command === "natural" ? `/campaign ${text.trim()}` : text;
 }
 
 function getBotConfigs(): MarketingBotConfig[] {
@@ -137,29 +126,19 @@ function getBotConfigs(): MarketingBotConfig[] {
     return getMarketingBotConfigsFromEnv(process.env);
   } catch (error) {
     const fallbackToken = process.env.TELEGRAM_BOT_TOKEN;
-    if (fallbackToken) {
-      return [
-        {
-          role: "manager",
-          token: fallbackToken,
-          displayName: "Marketing Manager Bot",
-          commands: ["brief", "flow", "campaign", "tasks", "run", "approve", "reject", "report", "whoami", "help"],
-          shortDescription: "AI marketing manager for campaign orchestration and approvals.",
-          description:
-            "AI Marketing Command Center manager. Creates campaigns, delegates work to specialist bots, tracks task flow, and keeps human approval before publishing, launching, or spending."
-        }
-      ];
-    }
-
-    throw error;
+    if (!fallbackToken) throw error;
+    return [{
+      role: "manager",
+      token: fallbackToken,
+      displayName: "Marketing Manager Bot",
+      commands: [...managerCommands],
+      shortDescription: "AI marketing manager for controlled campaign operations.",
+      description: "Marketing command center with human approval gates."
+    }];
   }
 }
 
-async function telegramApi<T>(
-  token: string,
-  method: string,
-  body: Record<string, unknown>
-): Promise<T> {
+async function telegramApi<T>(token: string, method: string, body: Record<string, unknown>): Promise<T> {
   const response = await fetch(`https://api.telegram.org/bot${token}/${method}`, {
     method: "POST",
     headers: { "content-type": "application/json" },
@@ -167,118 +146,430 @@ async function telegramApi<T>(
     body: JSON.stringify(body)
   });
   const payload = (await response.json()) as { ok: boolean; result?: T; description?: string };
-  if (!payload.ok) {
-    throw new Error(payload.description ?? `Telegram API error while calling ${method}`);
-  }
+  if (!payload.ok) throw new Error(payload.description ?? `Telegram API error while calling ${method}`);
   return payload.result as T;
 }
 
 async function sendMessage(token: string, chatId: number | string, text: string) {
   await telegramApi(token, "sendMessage", {
     chat_id: chatId,
-    text: text.slice(0, 3900),
+    text: cleanTelegramText(text).slice(0, 3900),
     disable_web_page_preview: true
   });
 }
 
 async function sendTyping(token: string, chatId: number | string) {
-  await telegramApi(token, "sendChatAction", {
-    chat_id: chatId,
-    action: "typing"
-  });
+  await telegramApi(token, "sendChatAction", { chat_id: chatId, action: "typing" });
 }
 
 function wait(ms: number) {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+  return new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 }
 
-function coordinationMessage(role: string, topic: string) {
-  const messages: Record<string, string> = {
-    "market-radar": [
-      "Tôi nhận phần nghiên cứu thị trường.",
-      `Tôi sẽ lọc insight, khách hàng mục tiêu, đối thủ và góc truyền thông cho: ${topic}.`,
-      "Kết quả sẽ được chuyển cho Content Creator để viết đúng trọng tâm."
-    ].join("\n"),
-    "content-creator": [
-      "Tôi nhận phần sản xuất nội dung.",
-      `Tôi sẽ dùng insight chiến dịch để tạo hook, bài social, CTA và biến thể nội dung cho: ${topic}.`,
-      "Bản nháp vẫn cần Manager phê duyệt trước khi đăng."
-    ].join("\n"),
-    "performance-brand": [
-      "Tôi nhận phần kiểm duyệt chất lượng.",
-      `Tôi sẽ rà soát tone thương hiệu, CTA, rủi ro claim và KPI cho: ${topic}.`,
-      "Không launch, không chạy ads, không publish khi chưa có phê duyệt."
-    ].join("\n")
-  };
-  return messages[role] ?? `Tôi nhận nhiệm vụ cho: ${topic}.`;
+async function mutateRuntime<T>(
+  controller: RuntimeController,
+  mutation: (snapshot: TelegramRuntimeSnapshot) => { snapshot: TelegramRuntimeSnapshot; value: T }
+): Promise<T> {
+  let resolveValue: (value: T) => void;
+  let rejectValue: (reason: unknown) => void;
+  const result = new Promise<T>((resolvePromise, rejectPromise) => {
+    resolveValue = resolvePromise;
+    rejectValue = rejectPromise;
+  });
+  controller.mutationQueue = controller.mutationQueue.then(async () => {
+    try {
+      const changed = mutation(controller.snapshot);
+      await saveRuntimeSnapshot(controller.statePath, changed.snapshot);
+      controller.snapshot = changed.snapshot;
+      resolveValue(changed.value);
+    } catch (error) {
+      rejectValue(error);
+    }
+  });
+  return result;
 }
 
-function newestRunId(session: TelegramSession) {
-  return session.pendingApprovals[0]?.run_id;
+function updateKey(role: MarketingBotRole, updateId: number) {
+  return roleUpdatePrefixes[role] * 1_000_000_000_000 + updateId;
 }
 
-function formatAiReply(
-  target: MarketingBotConfig,
-  output: MarketingAgentOutput,
-  runId?: string
+async function markUpdateProcessed(
+  controller: RuntimeController,
+  role: MarketingBotRole,
+  updateId: number
 ) {
-  return [
-    `${target.displayName} - Kết quả chuyên môn`,
-    cleanTelegramText(output.text),
-    runId
-      ? `Chờ duyệt: /approve ${runId} hoặc /reject ${runId} <lý do cần sửa>`
-      : "Chờ Manager kiểm tra trước khi dùng.",
-    output.mode === "ai" ? "Nguồn xử lý: 9Router AI" : "Nguồn xử lý: mô phỏng local an toàn",
-    output.fallbackReason ? `Ghi chú vận hành: ${output.fallbackReason}` : ""
-  ].filter(Boolean).join("\n\n");
+  await mutateRuntime(controller, (snapshot) => {
+    let next = addProcessedUpdate(snapshot, updateKey(role, updateId));
+    next = setBotOffset(next, role, updateId + 1);
+    return { snapshot: next, value: undefined };
+  });
 }
 
-async function runSpecialistDepartment(
-  target: MarketingBotConfig,
-  chatId: number | string,
-  topic: string,
-  context: string,
-  state: { session: TelegramSession }
-): Promise<MarketingAgentOutput | undefined> {
-  const command = campaignAutoRuns[target.role];
-  if (!command) return undefined;
+function roleLabel(role: MarketingBotRole) {
+  return ({
+    manager: "Marketing Manager",
+    "market-radar": "Market Radar",
+    "content-creator": "Content Creator",
+    "performance-brand": "Performance Brand"
+  })[role];
+}
 
+function stageLabel(stage: MarketingAgentRunRuntime["stage"]) {
+  return ({ research: "Research", content: "Content", brand: "Brand & KPI", final: "Final Package" })[stage];
+}
+
+function formatRunResult(run: MarketingAgentRunRuntime, output: MarketingAgentOutput) {
+  return [
+    `${roleLabel(run.role)} - ${stageLabel(run.stage)} Package`,
+    `Campaign: ${run.campaignId}`,
+    `Run: ${run.id}`,
+    "",
+    output.text,
+    "",
+    "CỔNG PHÊ DUYỆT CỦA CON NGƯỜI",
+    `Duyệt: /approve ${run.id}`,
+    `Từ chối: /reject ${run.id} <lý do cụ thể>`,
+    `Nguồn xử lý: ${output.mode === "ai" ? "9Router AI" : "mô phỏng local an toàn"}`,
+    output.fallbackReason ? `Ghi chú vận hành: ${output.fallbackReason}` : ""
+  ].filter(Boolean).join("\n");
+}
+
+function formatCampaignStatus(campaign: MarketingCampaignRuntime, runs: MarketingAgentRunRuntime[]) {
+  const campaignRuns = runs.filter((run) => run.campaignId === campaign.id);
+  return [
+    `CHIẾN DỊCH ${campaign.id}`,
+    `Mục tiêu: ${campaign.brief}`,
+    `Trạng thái: ${campaign.stage}`,
+    `Đã duyệt: ${campaign.approvedRunIds.length}/4 cổng`,
+    `Run hiện tại: ${campaign.activeRunId ?? "không có"}`,
+    "",
+    ...campaignRuns.map((run) => `- ${run.id} | ${stageLabel(run.stage)} | ${run.status}`),
+    campaign.stage === "ready_to_execute"
+      ? "Kết luận: sẵn sàng triển khai thủ công; hệ thống chưa tự đăng hoặc chạy quảng cáo."
+      : "Bước tiếp theo: xem /approvals hoặc chờ bot chuyên môn hoàn thành."
+  ].join("\n");
+}
+
+function formatCampaigns(snapshot: TelegramRuntimeSnapshot) {
+  if (snapshot.workflow.campaigns.length === 0) return "Chưa có chiến dịch. Dùng /campaign <mục tiêu>.";
+  return [
+    "DANH SÁCH CHIẾN DỊCH",
+    ...snapshot.workflow.campaigns.slice(-10).reverse().map((campaign) =>
+      `- ${campaign.id} | ${campaign.stage} | ${campaign.approvedRunIds.length}/4 cổng | ${campaign.brief.slice(0, 70)}`
+    ),
+    "Chi tiết: /status <CAMPAIGN_ID>"
+  ].join("\n");
+}
+
+function formatApprovals(snapshot: TelegramRuntimeSnapshot) {
+  const pending = listPendingRuns(snapshot.workflow);
+  if (pending.length === 0) return "Không có kết quả nào đang chờ duyệt.";
+  return [
+    "HÀNG ĐỢI PHÊ DUYỆT",
+    ...pending.map((run) => `- ${run.id} | ${run.campaignId} | ${stageLabel(run.stage)} | ${roleLabel(run.role)}`),
+    "Dùng /approve <RUN_ID> hoặc /reject <RUN_ID> <lý do>."
+  ].join("\n");
+}
+
+function formatWhoami(update: TelegramUpdate) {
+  return [
+    "THÔNG TIN KHÓA QUYỀN TELEGRAM",
+    `TELEGRAM_GROUP_ID=${update.message?.chat.id ?? ""}`,
+    `OPERATOR_TELEGRAM_USER_ID=${update.message?.from?.id ?? ""}`,
+    `Chat type: ${update.message?.chat.type ?? "unknown"}`,
+    `Username: ${update.message?.from?.username ? `@${update.message.from.username}` : "unknown"}`
+  ].join("\n");
+}
+
+async function runWorkflowStage(
+  runId: string,
+  chatId: number | string,
+  configs: MarketingBotConfig[],
+  controller: RuntimeController
+) {
+  const run = controller.snapshot.workflow.runs.find((item) => item.id === runId);
+  if (!run || run.status !== "running") return;
+  const campaign = controller.snapshot.workflow.campaigns.find((item) => item.id === run.campaignId);
+  if (!campaign) throw new Error(`Campaign ${run.campaignId} does not exist.`);
+  const target = configs.find((item) => item.role === run.role);
+  if (!target) throw new Error(`Bot for role ${run.role} is not configured.`);
+
+  await sendTyping(target.token, chatId);
+  await sendMessage(target.token, chatId, [
+    `${roleLabel(run.role)} đã nhận nhiệm vụ ${stageLabel(run.stage)}.`,
+    `Campaign: ${campaign.id}`,
+    `Run: ${run.id}`,
+    "Đang xử lý đầu vào đã được duyệt từ cổng trước."
+  ].join("\n"));
   await sendTyping(target.token, chatId);
   await wait(700);
-  await sendMessage(target.token, chatId, coordinationMessage(target.role, topic));
-  await sendTyping(target.token, chatId);
 
-  const specialistText = `/${command} ${topic}`;
-  const result = handleMarketingTeamCommand(state.session, specialistText, target.role);
-  state.session = result.session;
-  const runId = newestRunId(state.session);
-
-  await sendTyping(target.token, chatId);
-  const aiOutput = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
-    role: target.role,
-    command,
-    topic,
-    context
+  const output = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
+    role: run.role,
+    command: stageCommands[run.stage],
+    topic: campaign.brief,
+    context: run.input
   });
 
-  await wait(700);
-  await sendMessage(
-    target.token,
-    chatId,
-    formatAiReply(target, aiOutput, runId)
-  );
-  return aiOutput;
+  const completedRun = await mutateRuntime(controller, (snapshot) => {
+    const completed = completeRun(
+      snapshot.workflow,
+      run.id,
+      output.text,
+      () => new Date().toISOString(),
+      { fallbackReason: output.fallbackReason }
+    );
+    return {
+      snapshot: { ...snapshot, workflow: completed.state },
+      value: completed.run
+    };
+  });
+  await sendTyping(target.token, chatId);
+  await sendMessage(target.token, chatId, formatRunResult(completedRun, output));
+}
+
+async function handleWorkflowCommand(
+  parsed: ReturnType<typeof parseCommand>,
+  update: TelegramUpdate,
+  configs: MarketingBotConfig[],
+  controller: RuntimeController
+) {
+  const manager = configs.find((item) => item.role === "manager");
+  if (!manager || !update.message) return;
+  const chatId = update.message.chat.id;
+  const actorId = String(update.message.from?.id ?? "unknown");
+
+  if (parsed.command === "campaign") {
+    const brief = parsed.args.join(" ").trim();
+    if (!brief) {
+      await sendMessage(manager.token, chatId, "Cách dùng: /campaign <mục tiêu chiến dịch cụ thể>.");
+      return;
+    }
+    const created = await mutateRuntime(controller, (snapshot) => {
+      const result = createCampaign(snapshot.workflow, {
+        brief,
+        createdBy: actorId,
+        idSuffix: `M${update.update_id}`
+      });
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result };
+    });
+    await sendMessage(manager.token, chatId, [
+      `Đã mở chiến dịch ${created.campaign.id}.`,
+      "Quy trình Stage-Gate: Research → duyệt → Content → duyệt → Brand & KPI → duyệt → Final → duyệt.",
+      `Market Radar đang nhận run ${created.run.id}.`
+    ].join("\n"));
+    await runWorkflowStage(created.run.id, chatId, configs, controller);
+    return;
+  }
+
+  if (parsed.command === "campaigns") {
+    await sendMessage(manager.token, chatId, formatCampaigns(controller.snapshot));
+    return;
+  }
+
+  if (parsed.command === "approvals") {
+    await sendMessage(manager.token, chatId, formatApprovals(controller.snapshot));
+    return;
+  }
+
+  if (parsed.command === "status" || parsed.command === "report") {
+    const requestedId = parsed.args[0];
+    const campaigns = controller.snapshot.workflow.campaigns;
+    const campaign = requestedId
+      ? campaigns.find((item) => item.id === requestedId)
+      : campaigns[campaigns.length - 1];
+    await sendMessage(
+      manager.token,
+      chatId,
+      campaign
+        ? formatCampaignStatus(campaign, controller.snapshot.workflow.runs)
+        : "Không tìm thấy chiến dịch. Dùng /campaigns để xem ID hợp lệ."
+    );
+    return;
+  }
+
+  if (parsed.command === "audit") {
+    const campaignId = parsed.args[0];
+    if (!campaignId) {
+      await sendMessage(manager.token, chatId, "Cách dùng: /audit <CAMPAIGN_ID>.");
+      return;
+    }
+    try {
+      const events = getCampaignTimeline(controller.snapshot.workflow, campaignId);
+      await sendMessage(manager.token, chatId, [
+        `NHẬT KÝ ${campaignId}`,
+        ...events.slice(-20).map((event) => `- ${event.createdAt} | ${event.action} | ${event.actorId} | ${event.summary}`)
+      ].join("\n"));
+    } catch {
+      await sendMessage(manager.token, chatId, "Không tìm thấy chiến dịch. Dùng /campaigns để xem ID hợp lệ.");
+    }
+    return;
+  }
+
+  if (parsed.command === "approve") {
+    const runId = parsed.args[0];
+    if (!runId) {
+      await sendMessage(manager.token, chatId, "Cách dùng: /approve <RUN_ID>.");
+      return;
+    }
+    const approved = await mutateRuntime(controller, (snapshot) => {
+      const result = approveRun(snapshot.workflow, runId, actorId);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result };
+    });
+    if (approved.alreadyApplied) {
+      await sendMessage(manager.token, chatId, `${runId} đã được duyệt trước đó; không tạo nhiệm vụ trùng.`);
+      return;
+    }
+    if (!approved.nextRun) {
+      await sendMessage(manager.token, chatId, [
+        `Đã duyệt cổng cuối cho ${approved.campaign.id}.`,
+        "Trạng thái: ready_to_execute.",
+        "Hệ thống không tự đăng bài, chạy ads hoặc chi tiền."
+      ].join("\n"));
+      return;
+    }
+    await sendMessage(manager.token, chatId, [
+      `Đã duyệt ${runId}.`,
+      `Chuyển giao có kiểm soát sang ${roleLabel(approved.nextRun.role)}.`,
+      `Run tiếp theo: ${approved.nextRun.id}`
+    ].join("\n"));
+    await runWorkflowStage(approved.nextRun.id, chatId, configs, controller);
+    return;
+  }
+
+  if (parsed.command === "reject") {
+    const [runId, ...reasonParts] = parsed.args;
+    const reason = reasonParts.join(" ").trim();
+    if (!runId || !reason) {
+      await sendMessage(manager.token, chatId, "Cách dùng: /reject <RUN_ID> <lý do cụ thể>.");
+      return;
+    }
+    const rejected = await mutateRuntime(controller, (snapshot) => {
+      const result = rejectRun(snapshot.workflow, runId, reason, actorId);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result };
+    });
+    await sendMessage(manager.token, chatId, [
+      `Đã từ chối ${rejected.run.id}.`,
+      `Lý do: ${reason}`,
+      `Yêu cầu sửa: /revise ${rejected.run.id} <chỉ dẫn sửa cụ thể>`
+    ].join("\n"));
+    return;
+  }
+
+  if (parsed.command === "revise") {
+    const [runId, ...feedbackParts] = parsed.args;
+    const feedback = feedbackParts.join(" ").trim();
+    if (!runId || !feedback) {
+      await sendMessage(manager.token, chatId, "Cách dùng: /revise <RUN_ID> <yêu cầu sửa cụ thể>.");
+      return;
+    }
+    const revision = await mutateRuntime(controller, (snapshot) => {
+      const result = reviseRun(snapshot.workflow, runId, feedback, actorId);
+      return { snapshot: { ...snapshot, workflow: result.state }, value: result };
+    });
+    await sendMessage(manager.token, chatId, `Đã mở revision ${revision.run.id} từ ${runId}.`);
+    await runWorkflowStage(revision.run.id, chatId, configs, controller);
+  }
+}
+
+async function handleLegacyCommand(
+  config: MarketingBotConfig,
+  parsed: ReturnType<typeof parseCommand>,
+  routedText: string,
+  chatId: number | string,
+  controller: RuntimeController
+) {
+  const result = await mutateRuntime(controller, (snapshot) => {
+    const handled = process.env.TELEGRAM_MARKET_RADAR_BOT_TOKEN
+      ? handleMarketingTeamCommand(snapshot.telegramSession, routedText, config.role)
+      : handleTelegramCommand(snapshot.telegramSession, routedText);
+    return {
+      snapshot: { ...snapshot, telegramSession: handled.session },
+      value: handled
+    };
+  });
+
+  if (config.role !== "manager" && specialistCommands.has(parsed.command)) {
+    await sendTyping(config.token, chatId);
+    const output = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
+      role: config.role,
+      command: parsed.command,
+      topic: parsed.args.join(" ").trim() || "AI Agent cho SME",
+      context: "Yêu cầu trực tiếp ngoài workflow chiến dịch; kết quả chưa được đưa vào Stage-Gate."
+    });
+    await sendMessage(config.token, chatId, [
+      `${config.displayName} - tư vấn chuyên môn độc lập`,
+      output.text,
+      "Kết quả này chưa thuộc chiến dịch. Dùng Manager /campaign <mục tiêu> để chạy quy trình doanh nghiệp."
+    ].join("\n\n"));
+    return;
+  }
+  for (const reply of result.messages) await sendMessage(config.token, chatId, reply);
+}
+
+async function processUpdate(
+  config: MarketingBotConfig,
+  allConfigs: MarketingBotConfig[],
+  update: TelegramUpdate,
+  controller: RuntimeController
+) {
+  const message = update.message;
+  if (!message?.text) return;
+  const parsed = parseCommand(message.text);
+  console.log(JSON.stringify({
+    event: "telegram_message",
+    bot: config.role,
+    chat_id: message.chat.id,
+    from_id: message.from?.id,
+    command: parsed.command
+  }));
+  if (!shouldBotHandleMessage(config.role, parsed.command)) return;
+
+  const authorization = evaluateTelegramAuthorization(process.env, {
+    chatId: String(message.chat.id),
+    userId: String(message.from?.id ?? "")
+  });
+  if (parsed.command === "whoami") {
+    const configured = Boolean(process.env.TELEGRAM_GROUP_ID && process.env.OPERATOR_TELEGRAM_USER_ID);
+    if (!configured || authorization.allowed) await sendMessage(config.token, message.chat.id, formatWhoami(update));
+    return;
+  }
+  if (!authorization.allowed) {
+    await sendMessage(
+      config.token,
+      message.chat.id,
+      authorization.reason === "missing_configuration"
+        ? "Command Center chưa khóa quyền. Dùng /whoami rồi cấu hình Group ID và Operator ID."
+        : "Command Center chỉ nhận lệnh từ group và người quản lý đã cấu hình."
+    );
+    return;
+  }
+
+  const routedText = normalizeMessageForRole(config.role, message.text, parsed.command);
+  const routedParsed = parseCommand(routedText);
+  if (config.role === "manager" && routedParsed.command === "health") {
+    await sendMessage(
+      config.token,
+      message.chat.id,
+      buildRuntimeHealthFromConfig(allConfigs, createAiProviderConfig(process.env), process.env)
+    );
+    return;
+  }
+  if (config.role === "manager" && workflowCommands.has(routedParsed.command)) {
+    await handleWorkflowCommand(routedParsed, update, allConfigs, controller);
+    return;
+  }
+  await handleLegacyCommand(config, routedParsed, routedText, message.chat.id, controller);
 }
 
 async function pollBot(
   config: MarketingBotConfig,
   allConfigs: MarketingBotConfig[],
-  state: { session: TelegramSession }
+  controller: RuntimeController
 ) {
-  let offset = 0;
+  let offset = controller.snapshot.botOffsets[config.role] ?? 0;
   let retryDelayMs = 1_000;
-  console.log(`${config.displayName} is running.`);
-
+  console.log(`${config.displayName} is running from offset ${offset}.`);
   while (true) {
     try {
       const updates = await telegramApi<TelegramUpdate[]>(config.token, "getUpdates", {
@@ -287,151 +578,33 @@ async function pollBot(
         allowed_updates: ["message"]
       });
       retryDelayMs = 1_000;
-
       for (const update of updates) {
         offset = update.update_id + 1;
-        const message = update.message;
-        if (!message?.text) continue;
-        const parsed = parseCommand(message.text);
-        console.log(
-          JSON.stringify({
-            event: "telegram_message",
-            bot: config.role,
-            chat_id: message.chat.id,
-            chat_type: message.chat.type,
-            from_id: message.from?.id,
-            command: parsed.command
-          })
-        );
-
-        if (!shouldBotHandleMessage(config.role, parsed.command)) {
-          continue;
-        }
-
-        const authorization = evaluateTelegramAuthorization(process.env, {
-          chatId: String(message.chat.id),
-          userId: String(message.from?.id ?? "")
-        });
-
-        if (parsed.command === "whoami") {
-          const authorizationConfigured = Boolean(
-            process.env.TELEGRAM_GROUP_ID && process.env.OPERATOR_TELEGRAM_USER_ID
-          );
-          if (authorizationConfigured && !authorization.allowed) {
-            await sendMessage(
-              config.token,
-              message.chat.id,
-              "Command Center chỉ hiển thị thông tin khóa quyền cho group và người quản lý đã cấu hình."
-            );
-            continue;
-          }
-          await sendMessage(config.token, message.chat.id, formatWhoami(update));
-          continue;
-        }
-
-        if (!authorization.allowed) {
-          const authorizationMessage =
-            authorization.reason === "missing_configuration"
-              ? "Command Center chưa khóa quyền. Dùng /whoami, sau đó cấu hình TELEGRAM_GROUP_ID và OPERATOR_TELEGRAM_USER_ID trước khi chạy nghiệp vụ."
-              : "Command Center chỉ nhận lệnh từ group và người quản lý đã cấu hình.";
-          await sendMessage(
-            config.token,
-            message.chat.id,
-            authorizationMessage
-          );
-          continue;
-        }
-
+        const key = updateKey(config.role, update.update_id);
+        if (hasProcessedUpdate(controller.snapshot, key)) continue;
         try {
-          const hasMarketingTeam = Boolean(process.env.TELEGRAM_MARKET_RADAR_BOT_TOKEN);
-          const routedText = normalizeMessageForRole(config.role, message.text, parsed.command);
-          const routedParsed = parseCommand(routedText);
-
-          if (hasMarketingTeam && config.role === "manager" && routedParsed.command === "health") {
-            await sendMessage(
-              config.token,
-              message.chat.id,
-              buildRuntimeHealthFromConfig(allConfigs, createAiProviderConfig(process.env), process.env)
-            );
-            continue;
-          }
-
-          const result = hasMarketingTeam
-            ? handleMarketingTeamCommand(state.session, routedText, config.role)
-            : handleTelegramCommand(state.session, routedText);
-          state.session = result.session;
-
-          if (hasMarketingTeam && config.role !== "manager" && specialistCommands.has(routedParsed.command)) {
-            const runId = newestRunId(state.session);
-            const aiOutput = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
-              role: config.role,
-              command: routedParsed.command,
-              topic: routedParsed.args.join(" ").trim() || "AI Agent service for SME",
-              context: "Yêu cầu trực tiếp trong Telegram AI Marketing Command Center"
-            });
-            result.messages = [formatAiReply(config, aiOutput, runId)];
-          }
-
-          for (const reply of result.messages) {
-            await sendMessage(config.token, message.chat.id, reply);
-          }
-
-          if (hasMarketingTeam && isCampaignCommand(config.role, routedParsed.command)) {
-            const configsByRole = Object.fromEntries(
-              allConfigs.map((item) => [item.role, item])
-            ) as Record<string, MarketingBotConfig>;
-            const topic = routedParsed.args.join(" ").trim() || "AI Agent service for SME";
-            const departmentOutputs: AgentHandoffOutput[] = [];
-
-            for (const handoff of getMarketingCampaignHandoffs(topic)) {
-              const target = configsByRole[handoff.role];
-              if (target) {
-                await sendMessage(target.token, message.chat.id, handoff.message);
-                const context = [
-                  `Brief chiến dịch: ${topic}`,
-                  "Kết quả phòng ban trước:",
-                  buildAgentHandoffContext(departmentOutputs)
-                ].join("\n\n");
-                const output = await runSpecialistDepartment(
-                  target,
-                  message.chat.id,
-                  topic,
-                  context,
-                  state
-                );
-                if (output) {
-                  departmentOutputs.push({ role: handoff.role, output: output.text });
-                }
-              }
-            }
-          }
+          await processUpdate(config, allConfigs, update, controller);
+          await markUpdateProcessed(controller, config.role, update.update_id);
         } catch (error) {
           const errorId = `TG-${Date.now()}`;
-          console.error(
-            JSON.stringify({
-              event: "telegram_command_error",
-              error_id: errorId,
-              bot: config.role,
-              command: parsed.command,
-              detail: error instanceof Error ? error.message : "Unknown error"
-            })
-          );
-          await sendMessage(
-            config.token,
-            message.chat.id,
-            `Tạm thời chưa xử lý được lệnh. Mã theo dõi: ${errorId}. Hãy thử lại hoặc dùng /health.`
-          );
+          console.error(JSON.stringify({
+            event: "telegram_command_error",
+            error_id: errorId,
+            bot: config.role,
+            detail: error instanceof Error ? error.message : "Unknown error"
+          }));
+          if (update.message) {
+            await sendMessage(config.token, update.message.chat.id, `Chưa xử lý được lệnh. Mã theo dõi: ${errorId}. Dùng /status hoặc /health để kiểm tra.`);
+          }
         }
       }
     } catch (error) {
-      console.error(
-        JSON.stringify({
-          event: "telegram_poll_error",
-          bot: config.role,
-          retry_in_ms: retryDelayMs,
-          detail: error instanceof Error ? error.message : "Unknown error"
-        })
-      );
+      console.error(JSON.stringify({
+        event: "telegram_poll_error",
+        bot: config.role,
+        retry_in_ms: retryDelayMs,
+        detail: error instanceof Error ? error.message : "Unknown error"
+      }));
       await wait(retryDelayMs);
       retryDelayMs = Math.min(retryDelayMs * 2, 30_000);
     }
@@ -440,18 +613,28 @@ async function pollBot(
 
 async function poll() {
   loadDotEnv();
-
   const configs = getBotConfigs();
-  const state = { session: createTelegramSession(seedData) };
+  const statePath = resolve(process.env.TELEGRAM_RUNTIME_STATE_PATH ?? "output/telegram-runtime-state.json");
+  const fallback = () => createRuntimeSnapshot({
+    telegramSession: createTelegramSession(seedData),
+    workflow: createEmptyWorkflowState()
+  });
+  const loaded = await loadRuntimeSnapshot(statePath, fallback);
+  const controller: RuntimeController = {
+    snapshot: loaded.snapshot,
+    statePath,
+    mutationQueue: Promise.resolve()
+  };
+  await saveRuntimeSnapshot(statePath, controller.snapshot);
 
-  console.log("AI Marketing Command Center is running.");
+  console.log("AI Marketing Command Center Enterprise Stage-Gate is running.");
   console.log("Configured bots:", configs.map((config) => config.displayName).join(", "));
-  console.log("Use /health, /brief, /campaign, /trend, /post, /review, /approve, /reject, /report.");
-
-  await Promise.all(configs.map((config) => pollBot(config, configs, state)));
+  console.log(`Runtime state: ${statePath}${loaded.recovered ? " (recovered from corrupt snapshot)" : ""}`);
+  console.log("Use /campaign, /campaigns, /status, /approvals, /approve, /reject, /revise, /audit, /health.");
+  await Promise.all(configs.map((config) => pollBot(config, configs, controller)));
 }
 
 poll().catch((error) => {
-  console.error(error);
+  console.error(error instanceof Error ? error.message : error);
   process.exit(1);
 });

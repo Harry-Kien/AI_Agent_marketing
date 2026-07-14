@@ -23,15 +23,20 @@ Lưu ý: mã dashboard được kế thừa từ MVP trước vẫn còn một s
 | Content Creator Bot | Content Team | Tạo hook, bài social, caption, script, CTA và lịch nội dung |
 | Performance Brand Bot | Brand & Performance | Review tone, claim, CTA, KPI, rủi ro và go/no-go |
 
-Luồng `/campaign` chạy tuần tự:
+Luồng `/campaign` chạy theo Enterprise Stage-Gate bốn cổng:
 
 ```text
 Owner
 -> Marketing Manager
 -> Market Radar output
--> Content Creator nhận brief + Radar output
--> Performance Brand nhận brief + Radar output + Content output
--> Owner approve/reject từng RUN_ID
+-> Owner duyệt Research RUN_ID
+-> Content Creator nhận brief + Research đã duyệt
+-> Owner duyệt Content RUN_ID
+-> Performance Brand nhận Research + Content đã duyệt
+-> Owner duyệt Brand & KPI RUN_ID
+-> Marketing Manager tổng hợp Final Campaign Package
+-> Owner duyệt Final RUN_ID
+-> ready_to_execute (không tự publish hoặc chạy ads)
 ```
 
 Các bot không phụ thuộc việc Telegram chuyển message từ bot này sang bot khác. Một orchestrator local điều khiển cả bốn bot và chủ động gửi handoff bằng đúng danh tính bot tương ứng.
@@ -43,6 +48,7 @@ Các bot không phụ thuộc việc Telegram chuyển message từ bot này san
 - 9Router/OpenAI-compatible Chat Completions API
 - Vitest + jsdom
 - Local seed data và `localStorage` cho dashboard MVP
+- Atomic local JSON snapshot cho Telegram workflow, audit, offset và restart recovery
 
 ## Cài đặt
 
@@ -122,12 +128,17 @@ Marketing Manager Bot:
 /brief
 /flow
 /campaign <mục tiêu chiến dịch>
+/campaigns
+/status <CAMPAIGN_ID>
+/approvals
+/audit <CAMPAIGN_ID>
 /tasks
 /run <TASK_ID>
 /approve <RUN_ID>
 /reject <RUN_ID> <lý do cần sửa>
+/revise <RUN_ID> <yêu cầu sửa cụ thể>
 /health
-/report
+/report [CAMPAIGN_ID]
 /whoami
 ```
 
@@ -173,22 +184,24 @@ Tin nhắn tự nhiên không có slash được Marketing Manager xem như mộ
 /campaign Tạo chiến dịch giới thiệu dịch vụ AI Agent cho doanh nghiệp nhỏ, kênh Facebook, mục tiêu đặt lịch tư vấn
 ```
 
-4. Quan sát Market Radar trả insight.
-5. Quan sát Content Creator sử dụng insight để tạo bản nháp.
-6. Quan sát Performance Brand review insight và bản nháp, đề xuất KPI.
-7. Chọn một `RUN_ID` và gửi:
+4. Quan sát Market Radar trả Research Package rồi dừng tại cổng duyệt.
+5. Gửi `/approve RESEARCH_RUN_ID`; chỉ lúc này Content Creator mới chạy.
+6. Gửi `/approve CONTENT_RUN_ID`; chỉ lúc này Performance Brand mới chạy.
+7. Thử vòng rework bằng lệnh:
 
 ```text
 /reject RUN_ID CTA chưa đủ rõ và chưa gắn với lịch tư vấn
 ```
 
-8. Chạy lại phần cần sửa, sau đó gửi:
+8. Yêu cầu sửa và duyệt lại:
 
 ```text
-/approve RUN_ID
+/revise RUN_ID Bổ sung một CTA duy nhất và KPI đặt lịch tư vấn
+/approve REVISION_RUN_ID
 ```
 
-9. Dùng `/report` và dashboard để trình bày trạng thái, evidence và human-in-the-loop.
+9. Duyệt Brand RUN_ID, sau đó duyệt Final RUN_ID.
+10. Dùng `/status CAMPAIGN_ID`, `/audit CAMPAIGN_ID` và `/approvals` để chứng minh human-in-the-loop và audit trail.
 
 ## Khả năng chịu lỗi
 
@@ -198,6 +211,8 @@ Tin nhắn tự nhiên không có slash được Marketing Manager xem như mộ
 - Nội dung Markdown thô được làm sạch trước khi gửi Telegram.
 - Log runtime không ghi token và không ghi toàn bộ nội dung yêu cầu của người dùng.
 - Lỗi command trả mã theo dõi thay vì phơi bày stack trace trong group.
+- Snapshot được ghi atomic; file lỗi được cách ly thành `.corrupt-*` và runtime phục hồi state sạch.
+- Update Telegram và lệnh approve được chống xử lý lặp; mỗi bot giữ offset riêng.
 
 ## Kiểm tra chất lượng
 
@@ -223,10 +238,14 @@ scripts/telegram-setup.ts               Cấu hình profile/command Telegram
 src/integrations/telegramAdapter.ts      Command, task, approval và session state
 src/integrations/telegramRuntime.ts      Authorization, output clean, handoff, health
 src/integrations/aiProvider.ts           Prompt, 9Router, timeout/retry/fallback
+src/integrations/marketingWorkflow.ts    Campaign/run state machine và bốn approval gate
+src/integrations/telegramStateStore.ts   Atomic snapshot, recovery và idempotency
 tests/telegramAdapter.test.ts            Manager command và approval tests
 tests/marketingTelegramTeam.test.ts      Bốn vai trò marketing tests
 tests/telegramRuntime.test.ts            Security/runtime helper tests
 tests/aiProvider.test.ts                 AI provider tests
+tests/marketingWorkflow.test.ts          Stage transition, reject, revise và idempotency
+tests/telegramStateStore.test.ts          Persistence, quarantine và processed update tests
 ```
 
 ## Cộng tác hai người
@@ -243,14 +262,14 @@ Nguồn sự thật chính:
 
 ## Phần còn mock
 
-- Session Telegram hiện nằm trong RAM và mất khi process restart.
+- Telegram workflow đã lưu local JSON và phục hồi qua restart; chưa phải production database đa máy.
 - Dashboard dùng seed data/localStorage, chưa đồng bộ realtime với Telegram session.
 - Không có publish connector, ads connector hoặc production deployment.
 - Khi AI provider không sẵn sàng, output fallback được ghi rõ là mô phỏng local.
 
 ## Roadmap sau MVP
 
-1. Persistence dùng SQLite/PostgreSQL cho Campaign, AgentRun, Approval và AuditEvent.
+1. Di chuyển local JSON snapshot sang SQLite/PostgreSQL cho vận hành đa máy.
 2. API dùng chung để Telegram và Dashboard đọc cùng nguồn dữ liệu.
 3. Approval Queue realtime trên dashboard.
 4. Contract test giữa Telegram runtime và dashboard.

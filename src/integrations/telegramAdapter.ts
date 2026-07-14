@@ -78,7 +78,7 @@ const marketingBotProfiles: Record<
     displayName: "Marketing Manager Bot",
     envKey: "TELEGRAM_MANAGER_BOT_TOKEN",
     agentId: "agent-pm",
-    commands: ["brief", "flow", "campaign", "tasks", "run", "approve", "reject", "health", "report", "whoami", "help"],
+    commands: ["brief", "flow", "campaign", "campaigns", "status", "approvals", "audit", "approve", "reject", "revise", "health", "report", "whoami", "help"],
     shortDescription: "Trưởng phòng marketing AI, điều phối chiến dịch và phê duyệt.",
     description:
       "Trưởng phòng AI Marketing Command Center. Tạo chiến dịch, giao việc cho các bot chuyên môn, theo dõi tiến độ và giữ cổng phê duyệt của con người trước khi đăng, chạy chiến dịch hoặc chi tiền."
@@ -122,10 +122,15 @@ const marketingCommandMenus: Record<MarketingBotRole, TelegramBotCommand[]> = {
     { command: "brief", description: "Xem brief marketing hôm nay" },
     { command: "flow", description: "Xem luồng demo chuẩn" },
     { command: "campaign", description: "Tạo chiến dịch marketing mới" },
+    { command: "campaigns", description: "Xem danh sách chiến dịch" },
+    { command: "status", description: "Xem trạng thái một chiến dịch" },
+    { command: "approvals", description: "Xem các kết quả đang chờ duyệt" },
+    { command: "audit", description: "Xem nhật ký một chiến dịch" },
     { command: "tasks", description: "Xem pipeline task marketing" },
     { command: "run", description: "Chạy workflow cho task có sẵn" },
     { command: "approve", description: "Phê duyệt output đang chờ" },
     { command: "reject", description: "Từ chối output đang chờ" },
+    { command: "revise", description: "Yêu cầu bot sửa output bị từ chối" },
     { command: "health", description: "Kiểm tra tình trạng hệ thống" },
     { command: "whoami", description: "Xem Group ID và User ID để khóa quyền" },
     { command: "report", description: "Xem báo cáo chiến dịch" }
