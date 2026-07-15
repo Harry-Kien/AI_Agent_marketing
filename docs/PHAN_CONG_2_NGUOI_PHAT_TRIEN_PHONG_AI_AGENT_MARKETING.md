@@ -31,69 +31,68 @@ Phạm vi hiện tại là Telegram-first và Facebook-first. Không đưa Lark 
 | F11 | Đo lường | Reach, engagement, click, lead, conversion và so sánh KPI |
 | F12 | Tự cải tiến | Bài học chiến dịch và đề xuất hành động/chiến dịch tiếp theo |
 
-## 3. Đội Agent và quyền sở hữu
+## 3. Thành viên và quyền sở hữu
 
 Hệ thống giữ đúng 6 agent. Không tạo thêm bot trong giai đoạn này.
 
-| Agent | Vai trò doanh nghiệp | Người phát triển chính | Người review |
+| Agent | Vai trò doanh nghiệp | Backend/AI Agent | Giao diện/Dashboard |
 |---|---|---|---|
-| Marketing Manager Agent | Trưởng phòng, nhận yêu cầu và điều phối | Người 1 | Người 2 |
-| Market Radar Agent | Nghiên cứu thị trường và đối thủ | Người 1 | Người 2 |
-| Content Creator Agent | Copywriter và Content Marketer | Người 1 | Người 2 |
-| Strategy & Creative Agent | Chiến lược nội dung và sản xuất video | Người 2 | Người 1 |
-| Brand & Performance Agent | Kiểm định thương hiệu, KPI và hiệu quả | Người 2 | Người 1 |
-| Page Growth & Community Agent | Xuất bản, cộng đồng và lead | Người 2 | Người 1 |
+| Marketing Manager Agent | Trưởng phòng, nhận yêu cầu và điều phối | Kiên | Bảo |
+| Market Radar Agent | Nghiên cứu thị trường và đối thủ | Kiên | Bảo |
+| Content Creator Agent | Copywriter và Content Marketer | Kiên | Bảo |
+| Strategy & Creative Agent | Chiến lược nội dung và sản xuất video | Kiên | Bảo |
+| Brand & Performance Agent | Kiểm định thương hiệu, KPI và hiệu quả | Kiên | Bảo |
+| Page Growth & Community Agent | Xuất bản, cộng đồng và lead | Kiên | Bảo |
 
 Nguyên tắc cân bằng:
 
-- Người 1 sở hữu **đầu vào, trí tuệ điều phối và nửa đầu pipeline**.
-- Người 2 sở hữu **tài sản sáng tạo, hành động ra bên ngoài và vòng phản hồi**.
-- Mỗi người có 40 điểm công việc chính; phần tích hợp 20 điểm được làm chung.
+- **Kiên (Người 1)** sở hữu Telegram, logic của 6 AI Agent, workflow, AI/API, dữ liệu runtime và hành động tích hợp.
+- **Bảo (Người 2)** sở hữu giao diện, dashboard, trực quan hóa văn phòng Agent, trải nghiệm duyệt, báo cáo và kiểm thử frontend.
+- Mỗi người có 40 điểm chuyên môn và 10 điểm tích hợp chung, tổng cộng **50/50**.
+- Kiên cung cấp API/schema ổn định; Bảo không đọc trực tiếp file runtime hoặc gọi API bên thứ ba từ trình duyệt.
 
 ## 4. Kiến trúc trách nhiệm
 
 ```mermaid
 flowchart LR
-    Admin["Admin qua Telegram"] --> A1["Người 1: Manager Intent"]
-    A1 --> A2["Người 1: Workflow và Policy"]
-    A2 --> A3["Người 1: Radar và Content"]
-    A3 --> Contract["Hợp đồng dữ liệu dùng chung"]
-    Contract --> B1["Người 2: Creative và Video"]
-    B1 --> B2["Người 2: Brand và Performance"]
-    B2 --> Approval{"Admin duyệt Final"}
-    Approval --> B3["Người 2: Page Growth và Meta"]
-    B3 --> Metrics["Người 2: Metrics và Community"]
-    Metrics --> Contract
-    Contract --> A2
+    Admin["Admin qua Telegram"] --> K1["Kiên: Telegram và Manager Intent"]
+    K1 --> K2["Kiên: 6 Agent, Workflow và Policy"]
+    K2 --> K3["Kiên: AI, Meta, Video, Community, Metrics"]
+    K3 --> API["Control API + SSE + Shared Schema"]
+    API --> B1["Bảo: Dashboard và Agent Office"]
+    B1 --> B2["Bảo: Campaign, Approval, Content Studio"]
+    B2 --> B3["Bảo: Community, Analytics, Audit UI"]
+    B3 --> AdminUI["Admin theo dõi và ra quyết định"]
+    AdminUI -. "lệnh/duyệt qua Telegram" .-> K1
 ```
 
-## 5. Phân công Người 1: Agent Core, Telegram và Intelligence
+## 5. Phân công Kiên (Người 1): Telegram, AI Agent và Backend
 
 ### 5.1. Trách nhiệm chính
 
-1. Nhận và hiểu yêu cầu tiếng Việt tự nhiên.
-2. Chuẩn hóa yêu cầu thành Campaign Brief.
-3. Điều phối trạng thái và bàn giao giữa các agent.
-4. Quản lý policy tự duyệt nội bộ và Final Approval.
-5. Tích hợp AI provider và output schema.
-6. Xây Market Radar và chức năng theo dõi đối thủ.
-7. Xây Content Creator và Content Package.
-8. Bảo đảm state persistence, idempotency và audit nghiệp vụ.
+1. Vận hành Telegram và hiểu yêu cầu tiếng Việt tự nhiên.
+2. Xây logic, prompt, skill và output contract cho cả 6 agent.
+3. Điều phối workflow, policy tự duyệt nội bộ và Final Approval.
+4. Tích hợp AI provider, Market/Competitor data, video provider và Meta Graph.
+5. Xử lý community, metrics, Learning Package và audit nghiệp vụ.
+6. Cung cấp Control API/SSE đã redacted cho dashboard của Bảo.
+7. Bảo đảm persistence, idempotency, bảo mật và khả năng phục hồi.
+8. Viết unit/integration test cho toàn bộ backend.
 
 ### 5.2. Hạng mục chi tiết
 
 | ID | Hạng mục | Điểm | Tiêu chí hoàn thành |
 |---|---|---:|---|
-| A01 | Vietnamese Intent Router | 4 | Hiểu tạo chiến dịch, duyệt, từ chối, sửa, trạng thái và xác nhận bằng câu tự nhiên |
-| A02 | Campaign Brief Builder | 3 | Không tạo campaign khi thiếu mục tiêu; biết hỏi bổ sung đúng một câu |
-| A03 | Workflow State Machine | 5 | Không nhảy stage; có retry giới hạn; không tạo run trùng |
-| A04 | Agent Orchestrator | 4 | Tự bàn giao nội bộ và chỉ hỏi Admin ở Final Gate |
-| A05 | Structured AI Output | 4 | Mỗi output có summary, evidence, risks, next action và quality score |
-| A06 | Market Research Skill | 3 | Insight có nguồn, thời gian, confidence và liên hệ với campaign |
-| A07 | Competitor Monitoring | 5 | Phát hiện thay đổi giá, chương trình, sản phẩm và nội dung; chống cảnh báo trùng |
-| A08 | Content Generation | 4 | Có bài Facebook, CTA, A/B variant và `publication_content` riêng |
-| A09 | Runtime Persistence | 3 | Khởi động lại không mất campaign; file lỗi được quarantine |
-| A10 | Core Tests | 5 | Unit/integration tests cho intent, workflow, policy, radar và content |
+| K01 | Telegram và Vietnamese Intent | 3 | Hiểu tạo chiến dịch, duyệt, từ chối, sửa, trạng thái và xác nhận bằng câu tự nhiên |
+| K02 | Workflow và Agent Orchestrator | 5 | Không nhảy stage, không tạo run trùng, tự bàn giao nội bộ |
+| K03 | AI Provider và Structured Output | 4 | Sáu agent có prompt/skill riêng; output có evidence, risk và quality score |
+| K04 | Market/Competitor Intelligence | 4 | Phát hiện thay đổi giá, chương trình, sản phẩm, nội dung và chống cảnh báo trùng |
+| K05 | Content, Creative và Video Backend | 5 | Tạo copy/A-B/publication content và quản lý video job qua provider adapter |
+| K06 | Brand, Performance và Quality Gate | 4 | Kiểm tra claim, tone, CTA, KPI và quyết định có cấu trúc |
+| K07 | Meta Publication Guard | 4 | Chỉ đăng đúng preview đã xác nhận; lưu `postId`; không retry mù |
+| K08 | Community và Lead Policy | 3 | Phân loại FAQ, lead, spam, khiếu nại và dữ liệu nhạy cảm |
+| K09 | Metrics, Learning và Control API | 4 | Thu chỉ số, tạo bài học và cung cấp read model/SSE cho dashboard |
+| K10 | Persistence, Security và Backend Tests | 4 | Phục hồi state, idempotency, redaction và failure-path tests |
 | **Tổng** |  | **40** |  |
 
 ### 5.3. File sở hữu chính
@@ -109,78 +108,87 @@ flowchart LR
 - `src/integrations/telegramStateStore.ts`
 - `src/integrations/aiProvider.ts`
 - `src/integrations/agentWorkProduct.ts`
+- `src/integrations/metaGraphAdapter.ts`
+- `src/integrations/customerCarePolicy.ts`
+- `src/integrations/controlApi.ts`
+- `scripts/control-api.ts`
 - Các test tương ứng trong `tests/`.
 
 ### 5.4. Module mới dự kiến
 
 - `src/integrations/competitorMonitor.ts`
 - `src/integrations/marketResearch.ts`
+- `src/integrations/videoGenerationAdapter.ts`
+- `src/integrations/campaignAnalytics.ts`
+- `src/integrations/communityInbox.ts`
 - `src/domain/competitorTypes.ts`
+- `src/domain/mediaTypes.ts`
+- `src/domain/analyticsTypes.ts`
 - `tests/competitorMonitor.test.ts`
 - `tests/marketResearch.test.ts`
+- Các test backend cho video, analytics và community.
 
-## 6. Phân công Người 2: Creative, Facebook, Community và Analytics
+## 6. Phân công Bảo (Người 2): Giao diện, Dashboard và Trực quan hóa
 
 ### 6.1. Trách nhiệm chính
 
-1. Nhận Content Package và tạo Creative Package.
-2. Xây pipeline Product-to-Video có adapter thay thế được nhà cung cấp.
-3. Kiểm định thương hiệu, claim, CTA và KPI.
-4. Tạo preview và xuất bản Facebook có xác nhận.
-5. Phân loại bình luận, inbox, lead và khiếu nại.
-6. Thu thập chỉ số, so sánh KPI và tạo Learning Package.
-7. Hiển thị realtime toàn bộ hoạt động trên dashboard.
-8. Bảo đảm mọi hành động bên ngoài có audit evidence.
+1. Thiết kế trải nghiệm vận hành chuyên nghiệp cho phòng Marketing AI.
+2. Xây dashboard tổng quan realtime từ Control API/SSE của Kiên.
+3. Trực quan hóa 6 agent đang nhận việc, xử lý, bàn giao và chờ duyệt.
+4. Xây Campaign Board, Approval Center, Competitor Intelligence và Content/Video Studio.
+5. Xây Community/Lead Center, Analytics và Learning Dashboard.
+6. Hiển thị trạng thái lỗi, loading, empty state và dữ liệu stale rõ ràng.
+7. Bảo đảm responsive, accessibility và không lộ secret trên giao diện.
+8. Viết component/UI tests và Playwright smoke flow.
 
 ### 6.2. Hạng mục chi tiết
 
 | ID | Hạng mục | Điểm | Tiêu chí hoàn thành |
 |---|---|---:|---|
-| B01 | Creative Brief | 3 | Có content pillar, format, visual direction và asset checklist |
-| B02 | Product-to-Video Pipeline | 6 | Tạo script, storyboard, voice, subtitle, video job và trạng thái |
-| B03 | Media Provider Adapter | 3 | Có mock provider và có thể thay bằng API thật qua cấu hình |
-| B04 | Brand Quality Gate | 4 | Kiểm tra tone, claim, thông tin, CTA và quyết định có cấu trúc |
-| B05 | Performance Plan | 3 | Có KPI, UTM, A/B test và điều kiện thành công |
-| B06 | Meta Publishing | 5 | Chỉ đăng đúng preview đã xác nhận; lưu `postId`; không retry mù |
-| B07 | Community Triage | 4 | Phân loại FAQ, lead, spam, khiếu nại và dữ liệu nhạy cảm |
-| B08 | Metrics & Learning Loop | 4 | Thu chỉ số, so KPI, tạo bài học và đề xuất campaign tiếp theo |
-| B09 | Realtime Dashboard | 5 | Hiển thị agent, campaign, audit, approval, publication và metrics |
-| B10 | External Tests | 3 | Contract tests cho media, Meta, community, analytics và dashboard |
+| B01 | Design System và App Shell | 4 | Navigation, màu trạng thái, typography và component foundation nhất quán |
+| B02 | Executive Dashboard | 5 | KPI, campaign health, pending approval, risk và hành động ưu tiên |
+| B03 | Visual Agent Office | 5 | Sáu agent có trạng thái realtime, task hiện tại, handoff và activity timeline |
+| B04 | Campaign Pipeline Board | 4 | Theo dõi đầy đủ các stage, owner, SLA, evidence và lỗi |
+| B05 | Approval & Publication Center | 4 | So sánh phiên bản, xem Final/preview, trạng thái duyệt và publication evidence |
+| B06 | Competitor Intelligence UI | 4 | Bảng thay đổi, bộ lọc, mức ảnh hưởng, nguồn và lịch sử snapshot |
+| B07 | Content & Video Studio | 4 | Xem copy A/B, storyboard, video job, asset preview và trạng thái render |
+| B08 | Community & Lead Center | 4 | Inbox phân loại, lead score, SLA, escalation và trạng thái xử lý |
+| B09 | Analytics & Learning Dashboard | 4 | KPI theo campaign/content, xu hướng và đề xuất cải tiến |
+| B10 | Frontend Quality | 2 | Component tests, responsive desktop/mobile, accessibility và Playwright smoke |
 | **Tổng** |  | **40** |  |
 
 ### 6.3. File sở hữu chính
 
-- `src/integrations/metaGraphAdapter.ts`
-- `src/integrations/customerCarePolicy.ts`
-- `src/integrations/controlApi.ts`
-- `scripts/control-api.ts`
 - `scripts/smoke-agent-flow.cjs`
 - `src/App.tsx`
 - `src/styles.css`
-- Các test tương ứng trong `tests/`.
+- Các component, hook và test giao diện tương ứng.
 
 ### 6.4. Module mới dự kiến
 
-- `src/integrations/videoGenerationAdapter.ts`
-- `src/integrations/campaignAnalytics.ts`
-- `src/integrations/communityInbox.ts`
-- `src/domain/mediaTypes.ts`
-- `src/domain/analyticsTypes.ts`
-- `tests/videoGenerationAdapter.test.ts`
-- `tests/campaignAnalytics.test.ts`
-- `tests/communityInbox.test.ts`
+- `src/components/agent-office/*`
+- `src/components/campaigns/*`
+- `src/components/approvals/*`
+- `src/components/competitors/*`
+- `src/components/content-studio/*`
+- `src/components/community/*`
+- `src/components/analytics/*`
+- `src/hooks/useControlApi.ts`
+- `src/hooks/useRuntimeEvents.ts`
+- `tests/dashboard.test.tsx`
+- `tests/agentOffice.test.tsx`
 
-## 7. Phần làm chung: 20 điểm tích hợp
+## 7. Phần làm chung: mỗi người 10 điểm tích hợp
 
 | ID | Công việc chung | Người thực hiện | Người xác nhận | Điểm |
 |---|---|---|---|---:|
-| S01 | Chốt schema Campaign, Run, Evidence, Media Asset và Metric | Cả hai | Cả hai | 4 |
-| S02 | Golden Sequence end-to-end | Người 1 chạy Telegram | Người 2 đối soát Dashboard/Meta | 4 |
-| S03 | Security review và xoay token | Người 1 kiểm tra Telegram/AI | Người 2 kiểm tra Meta/media | 3 |
-| S04 | Performance và chi phí API | Người 2 đo | Người 1 tối ưu orchestration | 2 |
+| S01 | Chốt schema Campaign, Run, Evidence, Media Asset và Metric | Kiên đề xuất backend contract | Bảo xác nhận khả năng hiển thị | 4 |
+| S02 | Golden Sequence end-to-end | Kiên chạy Telegram/backend | Bảo đối soát dashboard/UI | 4 |
+| S03 | Security review và xoay token | Kiên kiểm tra API/secret | Bảo kiểm tra UI/redaction | 3 |
+| S04 | Performance và chi phí | Kiên đo API/token | Bảo đo render/load time | 2 |
 | S05 | README, sequence diagram và tài liệu khóa luận | Mỗi người viết phần mình | Review chéo | 3 |
-| S06 | Demo rehearsal và dữ liệu mẫu | Cả hai | Cả hai | 2 |
-| S07 | Release checklist | Người tạo release | Người còn lại duyệt | 2 |
+| S06 | Demo rehearsal và dữ liệu mẫu | Kiên vận hành luồng | Bảo trình bày dashboard | 2 |
+| S07 | Release checklist | Kiên kiểm tra runtime | Bảo kiểm tra giao diện | 2 |
 | **Tổng** |  |  |  | **20** |
 
 ## 8. Hợp đồng dữ liệu dùng chung
@@ -247,15 +255,15 @@ interface PublicationEvidence {
 
 ### Sprint 0 - Chuẩn hóa nền tảng
 
-**Người 1**
+**Kiên**
 
-- Chốt intent, workflow stages và Agent Work Product.
-- Tạo test fixture cho một campaign chuẩn.
+- Chốt intent, workflow stages, Agent Work Product và Control API contract.
+- Tạo test fixture cho một campaign chuẩn và SSE event mẫu.
 
-**Người 2**
+**Bảo**
 
-- Chốt Media Asset, Publication Evidence và Metric schema.
-- Tạo mock dashboard state từ cùng fixture.
+- Chốt information architecture, design system và dashboard read model.
+- Tạo giao diện mock từ fixture và event mẫu của Kiên.
 
 **Điểm tích hợp**
 
@@ -263,31 +271,31 @@ interface PublicationEvidence {
 
 ### Sprint 1 - Research và Creative
 
-**Người 1**
+**Kiên**
 
 - Xây Market Research và Competitor Monitoring.
-- Hoàn thiện Content Package.
+- Hoàn thiện Content Package, Creative/Video contract và API read model.
 
-**Người 2**
+**Bảo**
 
-- Xây Creative Brief và video adapter mock.
-- Hiển thị asset pipeline trên dashboard.
+- Xây Executive Dashboard, Visual Agent Office và Competitor Intelligence UI.
+- Hiển thị Content Package và asset pipeline trên Content/Video Studio.
 
 **Điểm tích hợp**
 
-- Content Package của Người 1 phải tạo được video job của Người 2 mà không chuyển đổi thủ công.
+- Output backend của Kiên phải hiển thị được trên UI của Bảo mà không ánh xạ thủ công hoặc đọc file runtime trực tiếp.
 
 ### Sprint 2 - Quality và Publication
 
-**Người 1**
+**Kiên**
 
 - Hoàn thiện policy engine, Final Gate và intent duyệt/từ chối.
-- Kiểm tra idempotency và phục hồi runtime.
+- Hoàn thiện Brand Gate, Meta publication guard, idempotency và phục hồi runtime.
 
-**Người 2**
+**Bảo**
 
-- Hoàn thiện Brand Gate, preview và Meta publishing.
-- Lưu publication evidence và hiển thị audit.
+- Hoàn thiện Campaign Board và Approval & Publication Center.
+- Hiển thị preview, quality gate, audit và publication evidence realtime.
 
 **Điểm tích hợp**
 
@@ -295,15 +303,15 @@ interface PublicationEvidence {
 
 ### Sprint 3 - Community và Learning
 
-**Người 1**
+**Kiên**
 
-- Bổ sung intent quản lý community và campaign follow-up.
-- Cho Manager tạo chiến dịch tiếp theo từ Learning Package.
+- Xây community triage, metrics, Learning Package và intent follow-up.
+- Cho Manager tạo chiến dịch tiếp theo từ dữ liệu đã đo.
 
-**Người 2**
+**Bảo**
 
-- Xây community triage, metrics và Learning Package.
-- Hoàn thiện KPI dashboard.
+- Xây Community & Lead Center.
+- Hoàn thiện Analytics & Learning Dashboard.
 
 **Điểm tích hợp**
 
@@ -325,18 +333,18 @@ Nhánh tích hợp hiện tại: `codex/six-agent-meta-office`.
 ### 10.1. Quy tắc branch
 
 ```text
-feature/a-<issue>-<ten-ngan>   # Người 1
-feature/b-<issue>-<ten-ngan>   # Người 2
-fix/a-<issue>-<ten-ngan>
-fix/b-<issue>-<ten-ngan>
+feature/kien-<issue>-<ten-ngan>   # Kiên: Telegram/AI/backend
+feature/bao-<issue>-<ten-ngan>    # Bảo: UI/dashboard
+fix/kien-<issue>-<ten-ngan>
+fix/bao-<issue>-<ten-ngan>
 docs/<issue>-<ten-ngan>
 ```
 
 Ví dụ:
 
 ```text
-feature/a-21-competitor-monitor
-feature/b-22-product-video
+feature/kien-21-competitor-monitor
+feature/bao-22-agent-office-dashboard
 ```
 
 ### 10.2. Một vòng làm việc
@@ -379,7 +387,7 @@ Hãy đọc:
 3. GitHub Issue được giao
 4. Các file liên quan và test hiện có
 
-Vai trò của tôi: [NGƯỜI 1 hoặc NGƯỜI 2].
+Vai trò của tôi: [KIÊN - TELEGRAM/AI/BACKEND hoặc BẢO - UI/DASHBOARD].
 Issue: [LINK HOẶC NỘI DUNG ISSUE].
 
 Yêu cầu:
@@ -392,6 +400,30 @@ Yêu cầu:
 - Không tự merge, deploy, đăng Facebook hoặc chi tiền.
 - Cuối cùng báo file đã sửa, lệnh kiểm tra, kết quả và commit đề xuất.
 ```
+
+### 11.1. Cách hai người dùng AI Agent song song
+
+| Phiên AI | Phạm vi được phép | Đầu ra bàn giao |
+|---|---|---|
+| AI của Kiên | Telegram, workflow, agent logic, provider/API, state và backend tests | Schema, endpoint, event mẫu, test evidence và migration note |
+| AI của Bảo | Component, layout, dashboard, visualization, frontend state và UI tests | Screenshot, interaction evidence, component contract và responsive report |
+
+Quy trình cộng tác:
+
+```mermaid
+flowchart LR
+    IK["Issue của Kiên"] --> AK["AI Backend của Kiên"]
+    AK --> CK["Commit + API Contract + Test"]
+    IB["Issue của Bảo"] --> AB["AI Frontend của Bảo"]
+    CK --> AB
+    AB --> CB["Commit + Screenshot + UI Test"]
+    CB --> RK["Kiên review contract"]
+    CK --> RB["Bảo review khả năng hiển thị"]
+    RK --> E2E["Cả hai chạy Golden Sequence"]
+    RB --> E2E
+```
+
+Mỗi lần Kiên thay đổi API/schema, biên bản bàn giao phải ghi endpoint, mẫu JSON, trường thêm/bỏ và test liên quan. Mỗi lần Bảo thay đổi UI flow, biên bản phải ghi màn hình, trạng thái tương tác, ảnh kiểm thử và dữ liệu backend cần dùng. AI chỉ hỗ trợ phân tích, code và kiểm thử; Kiên và Bảo vẫn chịu trách nhiệm review, commit và merge.
 
 ## 12. Tiêu chí hoàn thành từng Pull Request
 
@@ -475,7 +507,7 @@ sequenceDiagram
 
 ## 14. Ma trận test
 
-| Nhóm test | Người 1 | Người 2 | Bắt buộc |
+| Nhóm test | Kiên | Bảo | Bắt buộc |
 |---|---:|---:|---:|
 | Intent tiếng Việt | Chính | Review | Có |
 | Workflow/state/idempotency | Chính | Review | Có |
@@ -530,8 +562,8 @@ Dự án được coi là hoàn thành khi:
 
 ## 17. Việc đầu tiên của hai người
 
-**Người 1 bắt đầu Issue A01:** thiết kế `CompetitorChangeEvent` và triển khai Competitor Monitor bằng dữ liệu fixture trước.
+**Kiên bắt đầu Issue K01:** thiết kế `CompetitorChangeEvent`, triển khai Competitor Monitor bằng fixture và mở read-only endpoint cho dashboard.
 
-**Người 2 bắt đầu Issue B01:** thiết kế `MediaAsset` và triển khai Product-to-Video adapter bằng mock provider trước.
+**Bảo bắt đầu Issue B01:** xây App Shell, Design System và Visual Agent Office bằng fixture/API contract do Kiên cung cấp.
 
-Sau khi hai Issue đầu tiên được merge, cả hai chạy Golden Sequence đến bước Creative Package để xác nhận hợp đồng dữ liệu trước khi phát triển API thật.
+Sau khi hai Issue đầu tiên được merge, Kiên chạy luồng Telegram còn Bảo đối soát cùng campaign trên dashboard. Chỉ phát triển API thật tiếp theo khi dữ liệu, trạng thái và audit khớp hoàn toàn giữa hai phía.
