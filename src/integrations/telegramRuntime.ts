@@ -71,7 +71,7 @@ export function formatRuntimeHealth(input: {
   operatorConfigured: boolean;
 }) {
   const checks = [
-    input.botCount === 4,
+    input.botCount === 6,
     input.groupConfigured,
     input.operatorConfigured
   ];
@@ -79,7 +79,7 @@ export function formatRuntimeHealth(input: {
 
   return [
     "Tình trạng AI Marketing Command Center",
-    `Bot Telegram: ${input.botCount}/4`,
+    `Bot Telegram: ${input.botCount}/6`,
     `AI Provider: ${input.aiEnabled ? `đang bật (${input.aiModel})` : "mô phỏng local"}`,
     `Khóa Group: ${input.groupConfigured ? "đã cấu hình" : "chưa cấu hình"}`,
     `Khóa Operator: ${input.operatorConfigured ? "đã cấu hình" : "chưa cấu hình"}`,

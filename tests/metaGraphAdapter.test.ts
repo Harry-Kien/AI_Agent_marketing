@@ -10,6 +10,28 @@ describe("guarded Meta Graph adapter", () => {
     expect(String(fetchMock.mock.calls[0][0])).not.toContain("top-secret");
   });
 
+  it("reads operational Page metrics without exposing the token", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ id: "123", name: "AI SME", fan_count: 100, followers_count: 120 })
+    });
+    const client = createMetaGraphClient(
+      createMetaGraphConfig({ META_PAGE_ID: "123", META_PAGE_ACCESS_TOKEN: "top-secret", META_GRAPH_API_VERSION: "v23.0" }),
+      fetchMock
+    );
+
+    expect(await client.readPageSummary()).toEqual({
+      id: "123",
+      name: "AI SME",
+      fan_count: 100,
+      followers_count: 120
+    });
+    expect(fetchMock.mock.calls[0][0]).toBe(
+      "https://graph.facebook.com/v23.0/123?fields=id%2Cname%2Cfan_count%2Cfollowers_count"
+    );
+    expect(String(fetchMock.mock.calls[0][0])).not.toContain("top-secret");
+  });
+
   it("hard-blocks publication unless flag, approval and exact preview are present", async () => {
     const fetchMock = vi.fn();
     const disabled = createMetaGraphClient(createMetaGraphConfig({ META_PAGE_ID: "123", META_PAGE_ACCESS_TOKEN: "secret" }), fetchMock);

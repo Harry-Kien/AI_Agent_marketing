@@ -7,6 +7,7 @@ export interface MetaGraphConfig {
 }
 
 export interface MetaPageIdentity { id: string; name: string }
+export interface MetaPageSummary extends MetaPageIdentity { fan_count?: number; followers_count?: number }
 export interface ConfirmedPublicationInput { message: string; approvalId: string; confirmationText: string }
 export interface MetaPublicationEvidence { postId: string; permalink?: string }
 type EnvLike = Record<string, string | undefined>;
@@ -40,6 +41,9 @@ export function createMetaGraphClient(config: MetaGraphConfig, fetchImpl: FetchL
   return {
     async checkPageIdentity(): Promise<MetaPageIdentity> {
       return request<MetaPageIdentity>(`${encodeURIComponent(config.pageId)}?${new URLSearchParams({ fields: "id,name" })}`);
+    },
+    async readPageSummary(): Promise<MetaPageSummary> {
+      return request<MetaPageSummary>(`${encodeURIComponent(config.pageId)}?${new URLSearchParams({ fields: "id,name,fan_count,followers_count" })}`);
     },
     buildPublicationPreview(input: { message: string }) {
       return { pageId: config.pageId, message: input.message.trim(), publishEnabled: config.publishEnabled, requiresConfirmation: true };

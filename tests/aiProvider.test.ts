@@ -56,7 +56,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
       context: "Campaign launch"
     });
 
-    expect(prompt.system).toContain("Content Strategy & Copy Agent");
+    expect(prompt.system).toContain("Content Creator Agent");
     expect(prompt.system).toContain("Bộ kỹ năng");
     expect(prompt.user).toContain("/post");
     expect(prompt.user).toContain("AI Agent cho SME");
@@ -76,7 +76,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
       topic: "Phản hồi bình luận khách hàng"
     });
 
-    expect(creative.system).toContain("Creative Production Agent");
+    expect(creative.system).toContain("Content Strategy & Creative Agent");
     expect(creative.system).toContain("visual brief");
     expect(growth.system).toContain("Page Growth & Community Agent");
     expect(growth.system).toContain("chăm sóc cộng đồng");

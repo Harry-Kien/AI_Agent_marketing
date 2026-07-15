@@ -54,14 +54,14 @@ describe("Telegram runtime helpers", () => {
 
   it("formats a health report without exposing bot tokens", () => {
     const report = formatRuntimeHealth({
-      botCount: 4,
+      botCount: 6,
       aiEnabled: true,
       aiModel: "cx/gpt-5.4-mini",
       groupConfigured: true,
       operatorConfigured: true
     });
 
-    expect(report).toContain("4/4");
+    expect(report).toContain("6/6");
     expect(report).toContain("cx/gpt-5.4-mini");
     expect(report).not.toContain("token");
   });

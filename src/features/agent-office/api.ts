@@ -9,15 +9,15 @@ export const officeFallback: OfficeSnapshot = {
   agents: [
     { id: "manager", name: "AI Marketing Manager", department: "Điều phối & phê duyệt", state: "working", task: "Tổng hợp campaign brief", latency: "1.2s" },
     { id: "radar", name: "Market Intelligence", department: "Nghiên cứu thị trường", state: "available", task: "Insight đã bàn giao", latency: "3.8s" },
-    { id: "copy", name: "Content Strategy & Copy", department: "Chiến lược nội dung", state: "available", task: "Content package đã duyệt", latency: "4.5s" },
-    { id: "creative", name: "Creative Production", department: "Sản xuất sáng tạo", state: "waiting_approval", task: "Visual brief đang chờ duyệt", latency: "5.1s" },
+    { id: "copy", name: "Content Creator", department: "Copywriting & nội dung", state: "available", task: "Content package đã duyệt", latency: "4.5s" },
+    { id: "creative", name: "Content Strategy & Creative", department: "Chiến lược & sáng tạo", state: "waiting_approval", task: "Visual brief đang chờ duyệt", latency: "5.1s" },
     { id: "brand", name: "Brand & Performance", department: "Kiểm định & KPI", state: "available", task: "Chờ creative package", latency: "-" },
     { id: "growth", name: "Page Growth & Community", department: "Page & CSKH", state: "available", task: "Chờ final package", latency: "-" }
   ],
   activity: [
     { id: "1", time: "10:31", actor: "Market Intelligence", message: "Bàn giao insight khách hàng SME cho Content Strategy." },
     { id: "2", time: "10:34", actor: "Bạn", message: "Đã duyệt content package RUN-DEMO-CNT-1." },
-    { id: "3", time: "10:35", actor: "Creative Production", message: "Đang soạn visual brief và asset checklist." }
+    { id: "3", time: "10:35", actor: "Content Strategy & Creative", message: "Đang soạn visual brief và asset checklist." }
   ],
   services: [
     { name: "Telegram", state: "online", detail: "6 danh tính Agent" },

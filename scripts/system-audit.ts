@@ -21,9 +21,9 @@ async function telegramCheck() {
     try {
       const response = await fetch(`https://api.telegram.org/bot${config.token}/getMe`, { signal: AbortSignal.timeout(10_000) });
       const payload = await response.json() as { ok: boolean; result?: { username?: string }; description?: string };
-      return { role: config.role, ok: payload.ok, username: payload.result?.username ?? null, error: payload.ok ? null : payload.description ?? "Telegram rejected credential" };
+      return { role: config.role, display_name: config.displayName, ok: payload.ok, username: payload.result?.username ?? null, error: payload.ok ? null : payload.description ?? "Telegram rejected credential" };
     } catch (error) {
-      return { role: config.role, ok: false, username: null, error: error instanceof Error ? error.message : "Connection error" };
+      return { role: config.role, display_name: config.displayName, ok: false, username: null, error: error instanceof Error ? error.message : "Connection error" };
     }
   }));
 }
@@ -40,7 +40,7 @@ async function main() {
   const metaConfig = createMetaGraphConfig(process.env);
   let meta: { ok: boolean; id?: string; name?: string; error?: string };
   try {
-    meta = { ok: true, ...(await createMetaGraphClient(metaConfig).checkPageIdentity()) };
+    meta = { ok: true, ...(await createMetaGraphClient(metaConfig).readPageSummary()) };
   } catch (error) {
     meta = { ok: false, error: error instanceof Error ? error.message : "Meta connection error" };
   }
@@ -52,13 +52,18 @@ async function main() {
 
   const activeBots = telegram.filter((item) => item.ok).length;
   const demoCoreReady = telegram.some((item) => item.role === "manager" && item.ok) && ai.mode === "ai" && controlApi;
+  const allAgentsReady = activeBots === 6;
+  const publicationReady = meta.ok && metaConfig.publishEnabled;
   const report = {
     checked_at: new Date().toISOString(),
     verdict: {
       demo_ready: demoCoreReady && activeBots >= 5,
-      production_ready: demoCoreReady && activeBots === 6 && meta.ok && metaConfig.publishEnabled,
+      all_agents_ready: allAgentsReady,
+      meta_connected: meta.ok,
+      publication_ready: publicationReady,
+      production_ready: demoCoreReady && allAgentsReady && publicationReady,
       active_telegram_bots: `${activeBots}/6`,
-      manager_relay_required: telegram.filter((item) => !item.ok).map((item) => item.role)
+      manager_relay_required: telegram.filter((item) => !item.ok).map((item) => item.display_name)
     },
     telegram,
     ai_provider: {

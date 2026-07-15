@@ -4,8 +4,8 @@ import type { TelegramRuntimeSnapshot } from "./telegramStateStore";
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
   ["market-radar", "Market Intelligence", "Nghiên cứu thị trường"],
-  ["content-creator", "Content Strategy & Copy", "Chiến lược nội dung"],
-  ["creative-production", "Creative Production", "Sản xuất sáng tạo"],
+  ["content-creator", "Content Creator", "Copywriting & nội dung"],
+  ["creative-production", "Content Strategy & Creative", "Chiến lược & sáng tạo"],
   ["performance-brand", "Brand & Performance", "Kiểm định & KPI"],
   ["page-growth", "Page Growth & Community", "Page & CSKH"]
 ] as const;
@@ -38,7 +38,7 @@ export function buildOfficeReadModel(snapshot: TelegramRuntimeSnapshot) {
       message: event.summary
     })),
     services: [
-      { name: "Telegram", state: "online", detail: "6 danh tính Agent" },
+      { name: "Telegram", state: "online", detail: "6 vai trò Agent" },
       { name: "9Router", state: "online", detail: "AI gateway" },
       { name: "Meta Page", state: process.env.META_PUBLISH_ENABLED === "true" ? "online" : "guarded", detail: process.env.META_PUBLISH_ENABLED === "true" ? "Được phép xuất bản" : "Đăng đang khóa" },
       { name: "Human approval", state: "online", detail: "Bắt buộc" }

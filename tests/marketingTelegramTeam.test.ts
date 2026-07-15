@@ -30,8 +30,8 @@ describe("Marketing Telegram team adapter", () => {
     expect(configs.map((config) => config.displayName)).toEqual([
       "Marketing Manager Bot",
       "Market Radar Bot",
-      "Content Strategy & Copy Agent",
-      "Creative Production Agent",
+      "Content Creator Agent",
+      "Content Strategy & Creative Agent",
       "Brand & Performance Agent",
       "Page Growth & Community Agent"
     ]);
@@ -129,7 +129,7 @@ describe("Marketing Telegram team adapter", () => {
       "Market Radar Bot"
     );
     expect(handleMarketingTeamCommand(session, "/post AI Agent SME", "content-creator").messages.join("\n")).toContain(
-      "Content Strategy & Copy Agent"
+      "Content Creator Agent"
     );
     expect(handleMarketingTeamCommand(session, "/review AI Agent SME", "performance-brand").messages.join("\n")).toContain(
       "Brand & Performance Agent"

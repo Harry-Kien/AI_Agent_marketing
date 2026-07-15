@@ -97,7 +97,7 @@ const marketingBotProfiles: Record<
   },
   "content-creator": {
     role: "content-creator",
-    displayName: "Content Strategy & Copy Agent",
+    displayName: "Content Creator Agent",
     envKey: "TELEGRAM_CONTENT_CREATOR_BOT_TOKEN",
     agentId: "agent-docs",
     commands: ["post", "caption", "script", "calendar", "hook", "help"],
@@ -107,13 +107,13 @@ const marketingBotProfiles: Record<
   },
   "creative-production": {
     role: "creative-production",
-    displayName: "Creative Production Agent",
+    displayName: "Content Strategy & Creative Agent",
     envKey: "TELEGRAM_CREATIVE_PRODUCTION_BOT_TOKEN",
     agentId: "agent-creative",
     commands: ["creative", "visual", "storyboard", "asset", "variant", "help"],
     shortDescription: "Sản xuất creative brief, visual direction, storyboard và biến thể tài sản.",
     description:
-      "Creative Production Agent. Chuyển bản nội dung đã duyệt thành visual brief, storyboard, asset checklist và biến thể sáng tạo. Không tự xuất bản hoặc thay đổi nội dung chiến lược."
+      "Content Strategy & Creative Agent. Chuyển bản nội dung đã duyệt thành creative direction, visual brief, storyboard, asset checklist và biến thể sáng tạo. Không tự xuất bản hoặc thay đổi nội dung chiến lược."
   },
   "performance-brand": {
     role: "performance-brand",
@@ -179,7 +179,7 @@ const marketingCommandMenus: Record<MarketingBotRole, TelegramBotCommand[]> = {
     { command: "hook", description: "Tạo hook mở đầu" }
   ],
   "creative-production": [
-    { command: "start", description: "Bắt đầu Creative Production Agent" },
+    { command: "start", description: "Bắt đầu Content Strategy & Creative Agent" },
     { command: "help", description: "Xem nghiệp vụ sản xuất sáng tạo" },
     { command: "creative", description: "Tạo creative package" },
     { command: "visual", description: "Tạo visual direction" },
@@ -395,7 +395,7 @@ export function getMarketingCampaignHandoffs(topic: string): MarketingHandoff[] 
     {
       role: "creative-production",
       message: [
-        "Creative Production Agent - Nhiệm vụ mới",
+        "Content Strategy & Creative Agent - Nhiệm vụ mới",
         `Nhiệm vụ: chuyển nội dung đã duyệt của chiến dịch "${topic}" thành gói sáng tạo.`,
         `Lệnh dự phòng: /creative ${topic}`,
         "Kết quả cần trả: visual direction, storyboard, asset checklist và các biến thể.",

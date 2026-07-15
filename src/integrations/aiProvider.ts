@@ -84,7 +84,7 @@ const roleSkills: Record<
     qualityGate: "Insight phải nối được nỗi đau khách hàng, thời điểm thị trường, khoảng trống đối thủ và góc chiến dịch dùng được."
   },
   "content-creator": {
-    name: "Content Strategy & Copy Agent",
+    name: "Content Creator Agent",
     mission: "Biến chiến lược chiến dịch thành bản nháp nội dung có thể dùng và luôn chờ phê duyệt.",
     skills: [
       "viết bài social",
@@ -96,7 +96,7 @@ const roleSkills: Record<
     qualityGate: "Nội dung có hook, giá trị, CTA, đúng giọng thương hiệu và không có claim thiếu căn cứ."
   },
   "creative-production": {
-    name: "Creative Production Agent",
+    name: "Content Strategy & Creative Agent",
     mission: "Biến bản nội dung đã duyệt thành gói sản xuất sáng tạo có thể bàn giao.",
     skills: ["visual brief", "storyboard", "asset checklist", "creative variant", "production handoff"],
     qualityGate: "Gói sáng tạo bám đúng nội dung đã duyệt, đủ kích thước, định dạng, accessibility và hướng dẫn sản xuất."

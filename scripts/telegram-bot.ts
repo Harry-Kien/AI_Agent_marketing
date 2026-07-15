@@ -217,15 +217,15 @@ function roleLabel(role: MarketingBotRole) {
   return ({
     manager: "Marketing Manager",
     "market-radar": "Market Radar",
-    "content-creator": "Content Strategy & Copy",
-    "creative-production": "Creative Production",
+    "content-creator": "Content Creator",
+    "creative-production": "Content Strategy & Creative",
     "performance-brand": "Brand & Performance",
     "page-growth": "Page Growth & Community"
   })[role];
 }
 
 function stageLabel(stage: MarketingAgentRunRuntime["stage"]) {
-  return ({ research: "Research", content: "Content Strategy", creative: "Creative Production", brand: "Brand & KPI", final: "Final Package" })[stage];
+  return ({ research: "Research", content: "Content Creation", creative: "Content Strategy & Creative", brand: "Brand & KPI", final: "Final Package" })[stage];
 }
 
 function formatRunResult(run: MarketingAgentRunRuntime, output: MarketingAgentOutput) {

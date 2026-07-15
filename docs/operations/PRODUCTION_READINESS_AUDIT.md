@@ -4,19 +4,21 @@
 
 Hệ thống đạt mức **demo-ready có kiểm soát**, phù hợp trình bày khóa luận và chạy luồng marketing stage-gate local. Hệ thống **chưa production-ready** cho vận hành Fanpage thật cho đến khi đủ sáu credential hợp lệ, rotate toàn bộ token đã lộ, hoàn tất Meta App Review/webhook và thay local JSON bằng durable workflow/database.
 
+Kiểm tra trực tiếp ngày 15/07/2026: 9Router trả structured output; Control API hoạt động; Meta Graph kết nối đúng Page `Nghiện Học AI Việt Nam`; 5/6 bot Telegram xác thực. Bot `@kien_content_creator1_bot` cần token BotFather mới, trong thời gian đó Manager relay xử lý stage Content Strategy & Creative.
+
 ## Ma trận năng lực
 
 | Năng lực | Trạng thái | Bằng chứng |
 |---|---|---|
 | Sáu vai trò doanh nghiệp | Đạt về contract | Workflow, prompt, dashboard và menu có đủ 6 role |
-| Sáu danh tính Telegram | Có điều kiện | 5 bot xác thực; Creative dùng Manager relay cho tới khi có token mới |
+| Sáu danh tính Telegram | Có điều kiện | 5 bot xác thực; Content Strategy & Creative dùng Manager relay cho tới khi có token mới |
 | Natural-language Manager | Đạt | Rule-first intent, confidence gate 0.82, không tự duyệt khi mơ hồ |
 | Human-in-the-loop | Đạt | 5 cổng chuyên môn + xác nhận publication riêng |
 | Agent output có cấu trúc | Đạt | Zod strict schema, quality score >= 60, evidence bắt buộc |
 | AI provider thật | Đạt local | 9Router OpenAI-compatible trả structured output, có timeout/retry/fallback |
 | Audit và restart recovery | Đạt local | Atomic JSON snapshot, processed update ID, quarantine file lỗi |
 | Dashboard realtime | Đạt local | Control API SSE phát runtime event, UI tự cập nhật |
-| Meta Page identity | Đạt read-only | Graph API v23 xác thực đúng Page |
+| Meta Page identity | Đạt read-only | Graph API v23 xác thực đúng Page và đọc được Page summary |
 | Meta publish | Khóa chủ động | Feature flag false; cần rotate token và App Review |
 | Customer care | Policy-ready | FAQ allowlist; giá/khiếu nại/PII/pháp lý/bảo mật luôn escalate |
 | Durable production workflow | Chưa đạt | Local JSON chưa thay thế queue/database/workflow engine |
@@ -41,7 +43,7 @@ Không cài đồng thời tất cả. Lộ trình hợp lý là PostgreSQL + du
 
 ## Blocker phải xử lý
 
-1. BotFather: revoke và cấp token mới cho Creative Production Agent.
+1. BotFather: revoke và cấp token mới cho `@kien_content_creator1_bot` (Content Strategy & Creative Agent).
 2. Rotate toàn bộ Telegram và Meta token từng xuất hiện trong ảnh/chat.
 3. Meta: App ID, App Secret, long-lived Page token, quyền đã review, HTTPS webhook và signature verification.
 4. Production: PostgreSQL, queue/durable engine, secret manager, backup và alert.

@@ -9,8 +9,8 @@ sequenceDiagram
     participant TG as Telegram Group
     participant M as Marketing Manager
     participant R as Market Intelligence
-    participant C as Content Strategy & Copy
-    participant P as Creative Production
+    participant C as Content Creator
+    participant P as Content Strategy & Creative
     participant B as Brand & Performance
     participant G as Page Growth & Community
     participant AI as 9Router / LLM
