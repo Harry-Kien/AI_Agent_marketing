@@ -8,6 +8,21 @@ describe("Vietnamese manager intent router", () => {
     expect((await resolveManagerIntent("Có gì đang chờ tôi duyệt?", { pendingRunIds: [] })).intent).toBe("approvals");
   });
 
+  it("does not confuse a campaign target audience with the community inbox", async () => {
+    const campaign = await resolveManagerIntent(
+      "Hãy tạo chiến dịch Facebook trong 7 ngày về giải pháp AI Agent giúp doanh nghiệp nhỏ tự động hóa marketing. Khách hàng mục tiêu là chủ doanh nghiệp có 5-30 nhân sự. Mục tiêu là thu hút khách đăng ký tư vấn.",
+      { pendingRunIds: [] }
+    );
+    const community = await resolveManagerIntent(
+      "Kiểm tra inbox và bình luận mới của khách hàng trên Page",
+      { pendingRunIds: [] }
+    );
+
+    expect(campaign.intent).toBe("create_campaign");
+    expect(campaign.brief).toContain("Facebook trong 7 ngày");
+    expect(community.intent).toBe("community_inbox");
+  });
+
   it("resolves short approval only when exactly one result is pending", async () => {
     const safe = await resolveManagerIntent("Duyệt", { pendingRunIds: ["RUN-01"] });
     expect(safe).toMatchObject({ intent: "approve", runId: "RUN-01" });

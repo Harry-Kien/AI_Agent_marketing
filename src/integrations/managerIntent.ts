@@ -75,13 +75,15 @@ export async function resolveManagerIntent(
   }
   if (/(chờ.*duyệt|cần.*duyệt|approval)/i.test(lower)) return { intent: "approvals", confidence: 0.96 };
   if (/(tình hình|trạng thái|tiến độ|status)/i.test(lower)) return { intent: "status", confidence: 0.92, campaignId: explicitCampaign };
-  if (/(hộp thư|inbox|bình luận|khách hàng)/i.test(lower)) return { intent: "community_inbox", confidence: 0.9 };
-  if (/(xác nhận đăng|đăng ngay|confirm publish)/i.test(lower)) return { intent: "confirm_publish", confidence: 0.94, campaignId: explicitCampaign };
-  if (/(lên lịch|chuẩn bị đăng|schedule)/i.test(lower)) return { intent: "schedule", confidence: 0.91, campaignId: explicitCampaign };
   if (/(tạo|lập|khởi tạo).*(chiến dịch|campaign)/i.test(lower) || /(marketing|quảng bá|ra mắt).*(cho|về)/i.test(lower)) {
     const brief = text.replace(/^.*?(?:chiến dịch|campaign)\s*/i, "").trim() || text;
     return { intent: "create_campaign", confidence: 0.94, brief };
   }
+  if (/(hộp thư|inbox|bình luận|tin nhắn khách hàng|chăm sóc khách hàng|phản hồi khách hàng)/i.test(lower)) {
+    return { intent: "community_inbox", confidence: 0.9 };
+  }
+  if (/(xác nhận đăng|đăng ngay|confirm publish)/i.test(lower)) return { intent: "confirm_publish", confidence: 0.94, campaignId: explicitCampaign };
+  if (/(lên lịch|chuẩn bị đăng|schedule)/i.test(lower)) return { intent: "schedule", confidence: 0.91, campaignId: explicitCampaign };
   if (/^(help|trợ giúp|hướng dẫn)$/i.test(lower)) return { intent: "help", confidence: 0.99 };
   return {
     intent: "unclear",
