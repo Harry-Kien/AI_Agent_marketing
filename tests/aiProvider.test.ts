@@ -6,6 +6,16 @@ import {
 } from "../src/integrations/aiProvider";
 
 describe("9Router/OpenAI-compatible AI provider", () => {
+  const structuredResponse = JSON.stringify({
+    summary: "Phân tích AI Agent cho SME với mục tiêu vận hành rõ ràng.",
+    deliverables: ["Insight khách hàng SME", "Góc truyền thông tiết kiệm thời gian"],
+    checks: ["Không sử dụng claim tuyệt đối"],
+    risks: ["Chưa có khảo sát khách hàng trực tiếp"],
+    evidence: ["Brief chiến dịch do người quản lý cung cấp"],
+    recommendation: "approve_with_conditions",
+    approval_question: "Duyệt gói này để chuyển sang bước tiếp theo?",
+    quality_score: 84
+  });
   it("builds provider config from 9Router style environment variables", () => {
     const config = createAiProviderConfig({
       NINE_ROUTER_API_KEY: "secret",
@@ -77,7 +87,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: "AI generated specialist output" } }]
+        choices: [{ message: { content: structuredResponse } }]
       })
     });
 
@@ -98,7 +108,8 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     );
 
     expect(output.mode).toBe("ai");
-    expect(output.text).toBe("AI generated specialist output");
+    expect(output.text).toContain("ĐIỂM CHẤT LƯỢNG: 84/100");
+    expect(output.text).toContain("Insight khách hàng SME");
     expect(fetchMock).toHaveBeenCalledWith(
       "https://api.9router.com/v1/chat/completions",
       expect.objectContaining({
@@ -112,7 +123,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     const fetchMock = vi.fn().mockResolvedValue({
       ok: true,
       json: async () => ({
-        choices: [{ message: { content: "Local proxy output" } }]
+        choices: [{ message: { content: structuredResponse } }]
       })
     });
 
@@ -206,5 +217,20 @@ describe("9Router/OpenAI-compatible AI provider", () => {
 
     expect(output.mode).toBe("mock");
     expect(output.fallbackReason).toContain("empty response");
+  });
+
+  it("rejects malformed AI output instead of passing it to approval", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ choices: [{ message: { content: "Một đoạn văn không đúng schema" } }] })
+    });
+    const output = await generateMarketingAgentOutput(
+      { enabled: true, baseUrl: "http://localhost:20128/v1", apiKey: "", model: "gpt", maxRetries: 0 },
+      { role: "market-radar", command: "trend", topic: "AI Agent SME" },
+      fetchMock
+    );
+    expect(output.mode).toBe("mock");
+    expect(output.fallbackReason).toContain("schema validation");
+    expect(output.text).toContain("ĐIỂM CHẤT LƯỢNG");
   });
 });

@@ -37,8 +37,9 @@ Mọi bước đăng bài, trả lời nội dung nhạy cảm, chạy ads, chi 
 - Telegram Bot API long polling
 - 9Router/OpenAI-compatible Chat Completions
 - Meta Graph API v23.0
+- Zod strict schema validation cho output Agent
 - Local atomic JSON runtime state
-- Local HTTP control API tại `127.0.0.1:8787`
+- Local HTTP/SSE control API tại `127.0.0.1:8787`
 - Vitest, jsdom và Playwright CLI
 
 ## Cài đặt
@@ -107,6 +108,7 @@ npm run test
 npm run typecheck
 npm run build
 npm run smoke
+npm run audit:system
 git diff --check
 ```
 
@@ -128,3 +130,5 @@ docs/operations/                          Kịch bản demo và readiness
 ## Trạng thái production
 
 Chạy local và demo stage-gate được. Để bật Meta production cần rotate token, Meta App ID/Secret, quyền Page đã review, webhook HTTPS công khai, verify token, signature verification, database và monitoring. Xem `docs/operations/META_PRODUCTION_READINESS.md`.
+
+Báo cáo trung thực theo từng năng lực và định hướng sử dụng LangGraph/Temporal/Trigger.dev/OpenTelemetry nằm tại `docs/operations/PRODUCTION_READINESS_AUDIT.md`.

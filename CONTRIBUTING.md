@@ -1,6 +1,6 @@
 # Hướng dẫn cộng tác dự án
 
-Tài liệu nguồn sự thật: `docs/PHAN_CONG_2_NGUOI_TELEGRAM_AGENT_MARKETING_KHOA_LUAN.md`.
+Tài liệu nguồn sự thật: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
 
 ## Quy trình ngắn gọn
 
@@ -47,6 +47,6 @@ docs(thesis): add end-to-end evidence matrix
 npm run test
 npm run typecheck
 npm run build
+npm run smoke
 git diff --check
 ```
-

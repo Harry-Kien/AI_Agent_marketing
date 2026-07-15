@@ -1,0 +1,33 @@
+name: Quality Gate
+
+on:
+  push:
+    branches: [main, dev, "codex/**", "feature/**", "fix/**"]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test
+      - run: npm run typecheck
+      - run: npm run build
+      - name: Reject token-shaped secrets
+        shell: bash
+        run: |
+          if git grep -n -E '[0-9]{9,10}:[A-Za-z0-9_-]{30,}|EAAR[A-Za-z0-9]+' -- ':!package-lock.json'; then
+            echo "Token-shaped secret detected in tracked files."
+            exit 1
+          fi

@@ -1,5 +1,7 @@
 # Phân công 2 người phát triển hệ thống AI Agent Marketing qua Telegram
 
+> **BẢN LƯU TRỮ TRƯỚC NÂNG CẤP 6 AGENT.** Nguồn sự thật hiện hành: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
 ## 1. Mục tiêu tài liệu
 
 Tài liệu này mô tả lại phạm vi dự án sau khi bỏ Lark ra khỏi quy trình MVP. Hệ thống hiện tập trung vào **Telegram-first AI Agent Marketing Command Center**: một người quản lý điều phối đội AI Agent marketing thông qua Telegram group, có dashboard web hỗ trợ quản trị, có AI xử lý qua 9Router/OpenAI-compatible API, có cơ chế phê duyệt của con người và có tài liệu thiết kế phù hợp cho khóa luận tốt nghiệp.

@@ -17,4 +17,13 @@ let snapshot = (await loadRuntimeSnapshot(statePath, () => createRuntimeSnapshot
 const api = createControlApi({ getSnapshot: () => snapshot });
 await api.listen();
 console.log(`Marketing Control API: http://${api.host}:${api.port}`);
-setInterval(async () => { snapshot = (await loadRuntimeSnapshot(statePath, () => snapshot)).snapshot; }, 2000);
+let fingerprint = JSON.stringify(snapshot.workflow);
+setInterval(async () => {
+  const next = (await loadRuntimeSnapshot(statePath, () => snapshot)).snapshot;
+  const nextFingerprint = JSON.stringify(next.workflow);
+  snapshot = next;
+  if (nextFingerprint !== fingerprint) {
+    fingerprint = nextFingerprint;
+    api.broadcast(snapshot);
+  }
+}, 500);

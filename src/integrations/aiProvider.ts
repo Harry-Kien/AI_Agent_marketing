@@ -1,4 +1,5 @@
 import type { MarketingBotRole } from "./telegramAdapter";
+import { formatAgentWorkProduct, parseAgentWorkProduct, type AgentWorkProduct } from "./agentWorkProduct";
 
 export interface AiProviderConfig {
   enabled: boolean;
@@ -155,9 +156,10 @@ export function buildMarketingPrompt(input: MarketingPromptInput): MarketingProm
       `Lệnh: /${input.command}`,
       `Chủ đề: ${input.topic}`,
       `Bối cảnh: ${input.context ?? "AI Marketing Command Center vận hành qua Telegram."}`,
-      "Bắt buộc có đúng 5 mục: Tóm tắt, Đề xuất, Cần kiểm tra, Rủi ro, Chờ duyệt.",
-      "Không viết chung chung. Mỗi ý phải giúp người quản lý ra quyết định hoặc chuyển bước tiếp theo.",
-      "Mỗi mục tối đa 2-3 bullet. Không dùng ký tự Markdown trang trí.",
+      "Trả về duy nhất một JSON object hợp lệ, không dùng code fence và không thêm giải thích ngoài JSON.",
+      "Schema bắt buộc: summary:string; deliverables:string[2..8]; checks:string[1..8]; risks:string[1..6]; evidence:string[1..8]; recommendation:approve|approve_with_conditions|revise|reject; approval_question:string; quality_score:integer 60..100.",
+      "Evidence phải nói rõ nguồn nào đến từ brief, dữ liệu đã duyệt hoặc giả định; không được bịa nguồn bên ngoài.",
+      "Quality score phản ánh mức đầy đủ và độ tin cậy, không mặc định cho điểm cao.",
       "Nhắc lại: mọi hành động launch, đăng bài, chạy ads hoặc gửi ra ngoài đều cần con người phê duyệt."
     ].join("\n")
   };
@@ -199,7 +201,8 @@ export async function generateMarketingAgentOutput(
             { role: "user", content: prompt.user }
           ],
           temperature: 0.35,
-          max_tokens: 650
+          max_tokens: 900,
+          response_format: { type: "json_object" }
         })
       });
 
@@ -215,7 +218,9 @@ export async function generateMarketingAgentOutput(
         throw new Error("AI provider returned an empty response");
       }
 
-      return { mode: "ai", text };
+      const parsed = parseAgentWorkProduct(text);
+      if (!parsed.success) throw new Error("AI provider returned output that failed schema validation");
+      return { mode: "ai", text: formatAgentWorkProduct(parsed.data) };
     } catch (error) {
       lastError = normalizeProviderError(error);
       if (attempt < maxRetries) {
@@ -234,6 +239,7 @@ export async function generateMarketingAgentOutput(
 function normalizeProviderError(error: unknown) {
   const message = error instanceof Error ? error.message : "unknown error";
   if (message.includes("empty response")) return message;
+  if (message.includes("schema validation")) return message;
   if (message.includes("AI provider unavailable")) return message;
   if (message.toLowerCase().includes("abort") || message.toLowerCase().includes("timeout")) {
     return "AI provider unavailable: request timeout";
@@ -257,12 +263,15 @@ function readNonNegativeInteger(value: string | undefined, fallback: number) {
 
 function buildMockOutput(input: MarketingPromptInput) {
   const profile = roleSkills[input.role];
-  return [
-    `${profile.name} output mô phỏng cho /${input.command}`,
-    `Tóm tắt: ${input.topic}`,
-    `Kết quả đề xuất: áp dụng ${profile.skills.slice(0, 3).join(", ")} cho chiến dịch.`,
-    `Cổng chất lượng: ${profile.qualityGate}`,
-    "Rủi ro: chưa gọi 9Router API, đây là output mô phỏng để demo.",
-    "Cần phê duyệt: người quản lý phải duyệt trước khi đăng, chạy ads hoặc gửi ra ngoài."
-  ].join("\n");
+  const product: AgentWorkProduct = {
+    summary: `${profile.name} tạo gói mô phỏng có cấu trúc cho chủ đề ${input.topic}.`,
+    deliverables: profile.skills.slice(0, 3).map((skill) => `Áp dụng ${skill} cho chiến dịch.`),
+    checks: [profile.qualityGate],
+    risks: ["9Router chưa tạo được output hợp lệ; kết quả này chỉ dùng để giữ luồng demo không bị gián đoạn."],
+    evidence: [`Brief do người quản lý cung cấp: ${input.topic}`],
+    recommendation: "approve_with_conditions",
+    approval_question: "Bạn có duyệt gói mô phỏng này để chuyển sang cổng tiếp theo không?",
+    quality_score: 68
+  };
+  return formatAgentWorkProduct(product);
 }

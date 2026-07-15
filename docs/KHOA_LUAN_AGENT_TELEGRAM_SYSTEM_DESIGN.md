@@ -1,5 +1,7 @@
 # Tai lieu thiet ke khoa luan: He thong AI Agent trong doanh nghiep qua Telegram
 
+> **BẢN LƯU TRỮ TRƯỚC NÂNG CẤP 6 AGENT.** Nguồn sự thật hiện hành: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
 ## 1. Ten de tai de xuat
 
 **Xay dung he thong AI Agent ho tro dieu phoi quy trinh Marketing/Van hanh cho doanh nghiep nho thong qua Telegram**

@@ -110,10 +110,13 @@ export function addProcessedUpdate(
   current: TelegramRuntimeSnapshot,
   updateId: number
 ): TelegramRuntimeSnapshot {
-  if (hasProcessedUpdate(current, updateId)) return cloneSnapshot(current);
-  const snapshot = cloneSnapshot(current);
-  snapshot.processedUpdateIds = [...snapshot.processedUpdateIds, updateId].slice(-1_000);
-  return snapshot;
+  return {
+    ...current,
+    botOffsets: { ...current.botOffsets },
+    processedUpdateIds: hasProcessedUpdate(current, updateId)
+      ? [...current.processedUpdateIds]
+      : [...current.processedUpdateIds, updateId].slice(-1_000)
+  };
 }
 
 export function setBotOffset(
@@ -121,7 +124,12 @@ export function setBotOffset(
   role: string,
   offset: number
 ): TelegramRuntimeSnapshot {
-  const snapshot = cloneSnapshot(current);
-  snapshot.botOffsets[role] = Math.max(snapshot.botOffsets[role] ?? 0, offset);
-  return snapshot;
+  return {
+    ...current,
+    botOffsets: {
+      ...current.botOffsets,
+      [role]: Math.max(current.botOffsets[role] ?? 0, offset)
+    },
+    processedUpdateIds: [...current.processedUpdateIds]
+  };
 }

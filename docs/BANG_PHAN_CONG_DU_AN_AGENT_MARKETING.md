@@ -1,5 +1,7 @@
 # Bảng mô tả và phân công dự án AI Agent Marketing Command Center
 
+> **BẢN LƯU TRỮ TRƯỚC NÂNG CẤP 6 AGENT.** Nguồn sự thật hiện hành: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
 ## 1. Đánh giá dashboard hiện tại
 
 Dashboard hiện tại đã có nền tảng MVP:

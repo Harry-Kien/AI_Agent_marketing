@@ -43,16 +43,16 @@ export const seedData: AppData = {
     },
     {
       id: "repo-004",
-      name: "Lark Operations Dashboard",
+      name: "Marketing Operations Dashboard",
       provider: "GitHub",
-      url: "https://github.com/demo/lark-ops-dashboard",
-      purpose: "Bảng điều phối công việc theo mô hình Lark Base.",
+      url: "https://github.com/demo/marketing-ops-dashboard",
+      purpose: "Bảng điều phối sáu Agent Marketing và các cổng phê duyệt.",
       business_area: "internal ops",
       status: "idea",
       owner_agent: "agent-pm",
       health_score: 55,
       last_activity: "2026-07-05",
-      next_action: "Chốt schema export Lark Base."
+      next_action: "Đồng bộ audit realtime từ Telegram runtime."
     },
     {
       id: "repo-005",
@@ -181,14 +181,14 @@ export const seedData: AppData = {
     },
     {
       id: "task-003",
-      title: "Viết spec export Lark Base",
+      title: "Viết spec Control API và audit export",
       repo_id: "repo-004",
       status: "spec",
       priority: "urgent",
       assigned_agent: "agent-spec",
-      input: "Cần export Repos, Tasks, Agents, Agent Runs, Daily Briefs.",
-      expected_output: "Schema rõ và mapping field.",
-      quality_gate: "Không cần API thật nhưng phải có adapter.",
+      input: "Cần API Repos, Tasks, Agents, Agent Runs, Daily Briefs và audit.",
+      expected_output: "Schema rõ, mapping field và dữ liệu đã loại bỏ bí mật.",
+      quality_gate: "API local chỉ bind localhost, không lộ token và có kiểm thử.",
       evidence: "",
       created_at: "2026-07-02",
       updated_at: "2026-07-06"
@@ -493,12 +493,12 @@ export const seedData: AppData = {
       blocked_tasks: ["task-014"],
       suggested_actions: [
         "Khóa release Repo Trend Radar cho tới khi test hết failing.",
-        "Hoàn tất adapter export Lark Base trước khi demo.",
+        "Hoàn tất Control API và sequence demo trước khi bảo vệ.",
         "Dùng AI Content Agent làm ví dụ repo release-ready."
       ],
       risks: [
         "Nếu task không có evidence, agent handoff sẽ khó kiểm chứng.",
-        "Lark API chưa nối thật nên cần nói rõ đây là export placeholder."
+        "Meta publish đang khóa cho tới khi token được rotate và quyền App được review."
       ],
       yesterday_results: [
         "Chuẩn hóa pipeline trạng thái.",

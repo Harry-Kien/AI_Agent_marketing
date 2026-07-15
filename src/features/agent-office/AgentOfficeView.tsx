@@ -15,7 +15,16 @@ function stateLabel(state: string) {
 export function AgentOfficeView() {
   const [snapshot, setSnapshot] = useState<OfficeSnapshot>(officeFallback);
   const refresh = () => void loadOfficeSnapshot().then(setSnapshot);
-  useEffect(() => { refresh(); const timer = window.setInterval(refresh, 5000); return () => window.clearInterval(timer); }, []);
+  useEffect(() => {
+    refresh();
+    const stream = new EventSource("http://127.0.0.1:8787/api/events");
+    const receive = (event: MessageEvent<string>) => {
+      try { setSnapshot({ ...(JSON.parse(event.data) as OfficeSnapshot), connected: true }); } catch { /* Ignore malformed local events. */ }
+    };
+    stream.addEventListener("runtime", receive as EventListener);
+    stream.onerror = () => setSnapshot((current) => ({ ...current, connected: false }));
+    return () => { stream.removeEventListener("runtime", receive as EventListener); stream.close(); };
+  }, []);
   const activeIndex = Math.max(0, stages.findIndex(([key]) => snapshot.stage.includes(key)));
 
   return (
@@ -59,7 +68,7 @@ export function AgentOfficeView() {
         </div>
 
         <aside className="office-side">
-          <section className="approval-desk"><div className="office-section-head"><div><ShieldCheck size={18} /><strong>Bàn phê duyệt</strong></div><span>{snapshot.approvals}</span></div><h3>Creative package</h3><p>Visual direction, storyboard và 4 asset đã sẵn sàng để kiểm tra.</p><div><button className="approve-button"><CheckCircle2 size={15} /> Duyệt</button><button>Yêu cầu sửa</button></div><small>Thao tác thật thực hiện qua Manager Bot hoặc Control API.</small></section>
+          <section className="approval-desk"><div className="office-section-head"><div><ShieldCheck size={18} /><strong>Bàn phê duyệt</strong></div><span>{snapshot.approvals}</span></div><h3>{snapshot.approvals ? "Gói công việc đang chờ" : "Không có gói chờ duyệt"}</h3><p>{snapshot.approvals ? "Mở Manager Bot để xem đầy đủ bằng chứng và đưa ra quyết định." : "Các Agent chỉ chuyển stage khi có quyết định hợp lệ từ người quản lý."}</p><div><button className="approve-button" disabled title="Phê duyệt an toàn qua Manager Bot"><CheckCircle2 size={15} /> Duyệt qua Telegram</button><button disabled title="Yêu cầu sửa qua Manager Bot">Yêu cầu sửa</button></div><small>Dashboard chỉ quan sát. Quyền phê duyệt thuộc Admin đã khóa Telegram User ID.</small></section>
           <section className="activity-log"><div className="office-section-head"><div><Activity size={18} /><strong>Phối hợp trực tiếp</strong></div><span>LIVE</span></div>{snapshot.activity.map((item) => <div className="activity-item" key={item.id}><time>{item.time}</time><div><strong>{item.actor}</strong><p>{item.message}</p></div></div>)}</section>
           <section className="service-strip">{snapshot.services.map((service) => <div key={service.name}><i className={service.state} /><span><strong>{service.name}</strong><small>{service.detail}</small></span></div>)}</section>
         </aside>

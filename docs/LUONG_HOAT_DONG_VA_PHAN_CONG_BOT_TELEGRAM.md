@@ -1,5 +1,7 @@
 # Luồng hoạt động hệ thống và phân công phát triển Bot Telegram
 
+> **BẢN LƯU TRỮ TRƯỚC NÂNG CẤP 6 AGENT.** Nguồn sự thật hiện hành: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
 ## 1. Mục tiêu tài liệu
 
 Tài liệu này mô tả chi tiết luồng hoạt động của hệ thống **AI Agent Marketing Command Center qua Telegram**, nhiệm vụ của từng bot, cách cấu hình token an toàn, sequence diagram, quy trình làm việc của 2 thành viên trên GitHub và danh sách công việc cần hoàn thiện để hệ thống vận hành đúng chuẩn doanh nghiệp.

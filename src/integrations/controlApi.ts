@@ -49,17 +49,38 @@ export function buildOfficeReadModel(snapshot: TelegramRuntimeSnapshot) {
 export function createControlApi(options: { getSnapshot: () => TelegramRuntimeSnapshot; host?: string; port?: number }) {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8787;
+  const eventClients = new Set<ServerResponse>();
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     response.setHeader("access-control-allow-origin", "http://127.0.0.1:5174");
+    if (request.method === "GET" && request.url === "/api/events") {
+      response.writeHead(200, {
+        "content-type": "text/event-stream; charset=utf-8",
+        "cache-control": "no-cache, no-transform",
+        connection: "keep-alive",
+        "access-control-allow-origin": "http://127.0.0.1:5174"
+      });
+      eventClients.add(response);
+      writeEvent(response, buildOfficeReadModel(options.getSnapshot()));
+      request.on("close", () => eventClients.delete(response));
+      return;
+    }
     response.setHeader("content-type", "application/json; charset=utf-8");
     if (request.method === "GET" && request.url === "/api/health") return send(response, 200, { ok: true, service: "marketing-control-api" });
     if (request.method === "GET" && request.url === "/api/runtime") return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
     return send(response, 404, { error: "not_found" });
   });
-  return { server, host, port, listen: () => new Promise<void>((resolve) => server.listen(port, host, resolve)) };
+  const broadcast = (snapshot: TelegramRuntimeSnapshot) => {
+    const payload = buildOfficeReadModel(snapshot);
+    for (const client of eventClients) writeEvent(client, payload);
+  };
+  return { server, host, port, broadcast, listen: () => new Promise<void>((resolve) => server.listen(port, host, resolve)) };
 }
 
 function send(response: ServerResponse, status: number, payload: unknown) {
   response.statusCode = status;
   response.end(JSON.stringify(payload));
+}
+
+function writeEvent(response: ServerResponse, payload: unknown) {
+  response.write(`event: runtime\ndata: ${JSON.stringify(payload)}\n\n`);
 }

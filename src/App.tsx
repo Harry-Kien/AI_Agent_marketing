@@ -605,16 +605,16 @@ function App() {
         <div className="split">
           <Panel title="Local setup" icon={<ShieldCheck size={18} />}>
             <pre className="csv-preview">{[
-              "1. Create 4 bots with @BotFather.",
+              "1. Tạo 6 bot bằng @BotFather.",
               "2. Add all bots to AI Marketing Command Center.",
-              "3. Put 4 TELEGRAM_*_BOT_TOKEN values in .env.",
+              "3. Điền 6 TELEGRAM_*_BOT_TOKEN vào .env.",
               "4. Optional: set TELEGRAM_GROUP_ID and OPERATOR_TELEGRAM_USER_ID.",
               "5. Run: npm run telegram:bot"
             ].join("\n")}</pre>
           </Panel>
           <Panel title="Safety rule" icon={<ShieldCheck size={18} />}>
             <p className="note">
-              Agent output is simulated. Telegram commands create handoff records and pending approvals only. The operator must approve before the task status changes, and the MVP never edits repo code or deploys automatically.
+              Agent dùng 9Router khi provider hoạt động và chỉ fallback có ghi nhãn khi API lỗi. Admin phải phê duyệt trước khi chuyển stage; hệ thống không tự chạy ads, chi tiền hoặc deploy.
             </p>
           </Panel>
         </div>

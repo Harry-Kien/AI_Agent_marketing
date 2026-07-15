@@ -1,5 +1,7 @@
 # Mô tả chi tiết hệ thống AI Agent Marketing qua Telegram
 
+> **BẢN LƯU TRỮ TRƯỚC NÂNG CẤP 6 AGENT.** Nguồn sự thật hiện hành: `README.md`, `docs/operations/SIX_AGENT_SEQUENCE_DEMO.md` và `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
 ## 1. Tổng quan hệ thống
 
 Hệ thống **AI Agent Marketing Command Center qua Telegram** là một nền tảng mô phỏng cách một doanh nghiệp nhỏ hoặc doanh nghiệp một người có thể vận hành đội ngũ marketing bằng các AI Agent chuyên trách.
