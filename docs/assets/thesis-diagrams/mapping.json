@@ -1,0 +1,67 @@
+[
+  {
+    "index": 1,
+    "heading": "6. Use case tổng thể",
+    "file": "diagram-01.png"
+  },
+  {
+    "index": 2,
+    "heading": "8. Kiến trúc tổng thể",
+    "file": "diagram-02.png"
+  },
+  {
+    "index": 3,
+    "heading": "9. Kiến trúc thành phần",
+    "file": "diagram-03.png"
+  },
+  {
+    "index": 4,
+    "heading": "10. Quy trình nghiệp vụ end-to-end",
+    "file": "diagram-04.png"
+  },
+  {
+    "index": 5,
+    "heading": "11. Sequence diagram chiến dịch chuẩn",
+    "file": "diagram-05.png"
+  },
+  {
+    "index": 6,
+    "heading": "12. Sequence auto-revision và escalation",
+    "file": "diagram-06.png"
+  },
+  {
+    "index": 7,
+    "heading": "13. Sequence xuất bản Facebook an toàn",
+    "file": "diagram-07.png"
+  },
+  {
+    "index": 8,
+    "heading": "14. Luồng chăm sóc khách hàng",
+    "file": "diagram-08.png"
+  },
+  {
+    "index": 9,
+    "heading": "15.1. DFD mức ngữ cảnh",
+    "file": "diagram-09.png"
+  },
+  {
+    "index": 10,
+    "heading": "15.2. DFD mức 1",
+    "file": "diagram-10.png"
+  },
+  {
+    "index": 11,
+    "heading": "16.2. ERD",
+    "file": "diagram-11.png"
+  },
+  {
+    "index": 12,
+    "heading": "17. State machine của Campaign",
+    "file": "diagram-12.png"
+  },
+  {
+    "index": 13,
+    "heading": "22. Deployment diagram",
+    "file": "diagram-13.png"
+  }
+]

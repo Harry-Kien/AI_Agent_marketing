@@ -2,7 +2,7 @@
 
 ## Kết luận
 
-Hệ thống đạt mức **demo-ready có kiểm soát**, phù hợp trình bày khóa luận và chạy luồng marketing stage-gate local. Hệ thống **chưa production-ready** cho vận hành Fanpage thật cho đến khi đủ sáu credential hợp lệ, rotate toàn bộ token đã lộ, hoàn tất Meta App Review/webhook và thay local JSON bằng durable workflow/database.
+Hệ thống đạt mức **production-ready cho thử nghiệm local có kiểm soát**: sáu bot, 9Router, Control API và Meta Graph đều kết nối; Final Package và publication confirmation là hai cổng người duyệt độc lập. Khái niệm này không đồng nghĩa đã sẵn sàng triển khai cloud nhiều người dùng; production doanh nghiệp vẫn cần rotate toàn bộ token đã lộ, hoàn tất Meta App Review/webhook và thay local JSON bằng durable workflow/database.
 
 Kiểm tra trực tiếp ngày 15/07/2026: 9Router trả structured output; Control API hoạt động; Meta Graph kết nối đúng Page `Nghiện Học AI Việt Nam`; 6/6 bot Telegram xác thực. Enterprise Risk-Based Approval tự bàn giao bốn stage nội bộ và giữ Final + Publication cho Admin.
 
@@ -19,7 +19,7 @@ Kiểm tra trực tiếp ngày 15/07/2026: 9Router trả structured output; Cont
 | Audit và restart recovery | Đạt local | Atomic JSON snapshot, processed update ID, quarantine file lỗi |
 | Dashboard realtime | Đạt local | Control API SSE phát runtime event, UI tự cập nhật |
 | Meta Page identity | Đạt read-only | Graph API v23 xác thực đúng Page và đọc được Page summary |
-| Meta publish | Khóa chủ động | Feature flag false; cần rotate token và App Review |
+| Meta publish | Đạt local có kiểm soát | Feature flag bật; chỉ đăng đúng `publication_content` sau Final approval và publication confirmation; trả postId/permalink |
 | Customer care | Policy-ready | FAQ allowlist; giá/khiếu nại/PII/pháp lý/bảo mật luôn escalate |
 | Durable production workflow | Chưa đạt | Local JSON chưa thay thế queue/database/workflow engine |
 | Observability production | Chưa đạt | Có audit log nhưng chưa có OpenTelemetry/Sentry collector và alert |
@@ -45,7 +45,17 @@ Không cài đồng thời tất cả. Lộ trình hợp lý là PostgreSQL + du
 
 1. Rotate toàn bộ Telegram và Meta token từng xuất hiện trong ảnh/chat.
 2. Meta: App ID, App Secret, long-lived Page token, quyền đã review, HTTPS webhook và signature verification.
-3. Production: PostgreSQL, queue/durable engine, secret manager, backup và alert.
+3. Production cloud: PostgreSQL, queue/durable engine, secret manager, backup và alert.
+
+## Kiểm tra hiện hành
+
+- 15 test files, 80/80 test passed.
+- Typecheck, production build và smoke test passed.
+- 6/6 Telegram bot xác thực.
+- 9Router trả structured output, không fallback trong lần audit cuối.
+- Meta có quyền quản lý bài viết, tương tác và messaging.
+- `demo_ready=true`, `publication_ready=true`, `production_ready=true` cho cấu hình local hiện tại.
+- Meta lỗi sau xác nhận chuyển campaign sang `failed`, ghi `publication_failed` và không auto-retry để tránh đăng trùng.
 
 ## Lệnh kiểm tra chuẩn
 

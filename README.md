@@ -136,3 +136,10 @@ docs/operations/                          Kịch bản demo và readiness
 Chạy local và demo stage-gate được. Để bật Meta production cần rotate token, Meta App ID/Secret, quyền Page đã review, webhook HTTPS công khai, verify token, signature verification, database và monitoring. Xem `docs/operations/META_PRODUCTION_READINESS.md`.
 
 Báo cáo trung thực theo từng năng lực và định hướng sử dụng LangGraph/Temporal/Trigger.dev/OpenTelemetry nằm tại `docs/operations/PRODUCTION_READINESS_AUDIT.md`.
+
+## Tài liệu khóa luận và trình bày
+
+- Tài liệu nguồn có đầy đủ Mermaid diagram: `docs/TAI_LIEU_THIET_KE_VA_TRINH_BAY_HE_THONG_AI_AGENT_MARKETING_2026.md`.
+- Bản Word 31 trang: `docs/AI_Agent_Marketing_Command_Center_Thesis_Design_2026.docx`.
+- Bản PDF kiểm tra trình bày: `docs/AI_Agent_Marketing_Command_Center_Thesis_Design_2026.pdf`.
+- Tạo lại sơ đồ và Word bằng `npm run docs:thesis`.
