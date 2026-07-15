@@ -9,7 +9,8 @@ const url = process.env.DEMO_URL || "http://127.0.0.1:5174/";
 
   page.on("pageerror", (error) => pageErrors.push(error.message));
 
-  await page.goto(url, { waitUntil: "networkidle", timeout: 60000 });
+  // The dashboard keeps an SSE connection open, so networkidle is never a valid readiness signal.
+  await page.goto(url, { waitUntil: "domcontentloaded", timeout: 60000 });
   await page.locator(".app-shell").waitFor({ timeout: 30000 });
   await page.getByRole("button", { name: /Agents/ }).click();
   await page.getByRole("button", { name: /Run full agent flow/ }).click();

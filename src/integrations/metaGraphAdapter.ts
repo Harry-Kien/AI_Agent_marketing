@@ -8,6 +8,7 @@ export interface MetaGraphConfig {
 
 export interface MetaPageIdentity { id: string; name: string }
 export interface MetaPageSummary extends MetaPageIdentity { fan_count?: number; followers_count?: number }
+export interface MetaPermission { permission: string; status: string }
 export interface ConfirmedPublicationInput { message: string; approvalId: string; confirmationText: string }
 export interface MetaPublicationEvidence { postId: string; permalink?: string }
 type EnvLike = Record<string, string | undefined>;
@@ -44,6 +45,13 @@ export function createMetaGraphClient(config: MetaGraphConfig, fetchImpl: FetchL
     },
     async readPageSummary(): Promise<MetaPageSummary> {
       return request<MetaPageSummary>(`${encodeURIComponent(config.pageId)}?${new URLSearchParams({ fields: "id,name,fan_count,followers_count" })}`);
+    },
+    async readGrantedPermissions(): Promise<string[]> {
+      const result = await request<{ data: MetaPermission[] }>("me/permissions");
+      return result.data
+        .filter(({ status }) => status === "granted")
+        .map(({ permission }) => permission)
+        .sort();
     },
     buildPublicationPreview(input: { message: string }) {
       return { pageId: config.pageId, message: input.message.trim(), publishEnabled: config.publishEnabled, requiresConfirmation: true };

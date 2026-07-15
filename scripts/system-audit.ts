@@ -38,9 +38,24 @@ async function main() {
     context: "System audit: output phải có schema và bằng chứng."
   });
   const metaConfig = createMetaGraphConfig(process.env);
-  let meta: { ok: boolean; id?: string; name?: string; error?: string };
+  let meta: { ok: boolean; id?: string; name?: string; error?: string; granted_permissions?: string[]; capabilities?: Record<string, boolean> };
   try {
-    meta = { ok: true, ...(await createMetaGraphClient(metaConfig).readPageSummary()) };
+    const client = createMetaGraphClient(metaConfig);
+    const [summary, grantedPermissions] = await Promise.all([
+      client.readPageSummary(),
+      client.readGrantedPermissions()
+    ]);
+    meta = {
+      ok: true,
+      ...summary,
+      granted_permissions: grantedPermissions,
+      capabilities: {
+        read_engagement: grantedPermissions.includes("pages_read_engagement"),
+        manage_posts: grantedPermissions.includes("pages_manage_posts"),
+        manage_engagement: grantedPermissions.includes("pages_manage_engagement"),
+        messaging: grantedPermissions.includes("pages_messaging")
+      }
+    };
   } catch (error) {
     meta = { ok: false, error: error instanceof Error ? error.message : "Meta connection error" };
   }

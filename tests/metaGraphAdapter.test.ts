@@ -32,6 +32,26 @@ describe("guarded Meta Graph adapter", () => {
     expect(String(fetchMock.mock.calls[0][0])).not.toContain("top-secret");
   });
 
+  it("reports granted Page capabilities for guarded operations", async () => {
+    const fetchMock = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({
+        data: [
+          { permission: "pages_manage_posts", status: "granted" },
+          { permission: "pages_messaging", status: "granted" },
+          { permission: "ads_management", status: "declined" }
+        ]
+      })
+    });
+    const client = createMetaGraphClient(
+      createMetaGraphConfig({ META_PAGE_ID: "123", META_PAGE_ACCESS_TOKEN: "top-secret", META_GRAPH_API_VERSION: "v23.0" }),
+      fetchMock
+    );
+
+    expect(await client.readGrantedPermissions()).toEqual(["pages_manage_posts", "pages_messaging"]);
+    expect(fetchMock.mock.calls[0][0]).toBe("https://graph.facebook.com/v23.0/me/permissions");
+  });
+
   it("hard-blocks publication unless flag, approval and exact preview are present", async () => {
     const fetchMock = vi.fn();
     const disabled = createMetaGraphClient(createMetaGraphConfig({ META_PAGE_ID: "123", META_PAGE_ACCESS_TOKEN: "secret" }), fetchMock);
