@@ -31,6 +31,15 @@ describe("Vietnamese manager intent router", () => {
     expect((await resolveManagerIntent("Duyệt", { pendingRunIds: ["RUN-01", "RUN-02"] })).intent).toBe("unclear");
   });
 
+  it("lets a repeated final approval prepare the preview for one ready campaign", async () => {
+    const result = await resolveManagerIntent("Duyệt", {
+      pendingRunIds: [],
+      approvedFinalRunIdsReadyToSchedule: ["RUN-FINAL-01"]
+    });
+
+    expect(result).toMatchObject({ intent: "approve", runId: "RUN-FINAL-01" });
+  });
+
   it("extracts rejection and revision feedback", async () => {
     const rejected = await resolveManagerIntent("Không duyệt vì CTA còn chung chung", { pendingRunIds: ["RUN-02"] });
     expect(rejected).toMatchObject({ intent: "reject", runId: "RUN-02" });

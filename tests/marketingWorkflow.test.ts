@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
   approveRun,
+  approveRunAndPreparePublication,
   buildStageInput,
   completeRun,
   createCampaign,
@@ -239,5 +240,52 @@ describe("enterprise marketing workflow", () => {
       action: "publication_failed",
       actorId: "meta-graph"
     });
+  });
+
+  it("prepares the exact publication preview immediately after final approval", () => {
+    let state = createCampaign(createEmptyWorkflowState(), {
+      brief: "Campaign auto preview",
+      createdBy: "owner",
+      now: clock,
+      idSuffix: "AUTOPREV"
+    }).state;
+    for (const stage of ["research", "content", "creative", "brand"] as const) {
+      const run = state.runs.find((item) => item.status === "running" && item.stage === stage)!;
+      state = completeRun(state, run.id, `${stage} package`, clock).state;
+      state = approveRun(state, run.id, "owner", clock).state;
+    }
+    const finalRun = state.runs.find((item) => item.status === "running" && item.stage === "final")!;
+    state = completeRun(state, finalRun.id, "final package", clock, {
+      publicationContent: "Bai Facebook final da duoc nguoi van hanh xem va duyet."
+    }).state;
+
+    const approved = approveRunAndPreparePublication(state, finalRun.id, "owner", clock);
+
+    expect(approved.publicationPrepared).toBe(true);
+    expect(approved.campaign.stage).toBe("publication_pending_confirmation");
+    expect(approved.campaign.publicationPreview).toContain("Bai Facebook final");
+  });
+
+  it("can prepare a preview when the final run was already approved", () => {
+    let state = createCampaign(createEmptyWorkflowState(), {
+      brief: "Campaign recover preview",
+      createdBy: "owner",
+      now: clock,
+      idSuffix: "RECOVER"
+    }).state;
+    for (const stage of ["research", "content", "creative", "brand", "final"] as const) {
+      const run = state.runs.find((item) => item.status === "running" && item.stage === stage)!;
+      state = completeRun(state, run.id, `${stage} package`, clock, {
+        publicationContent: stage === "final" ? "Bai Facebook da duyet nhung chua tao preview." : undefined
+      }).state;
+      state = approveRun(state, run.id, "owner", clock).state;
+    }
+    const finalRun = state.runs.find((item) => item.stage === "final")!;
+
+    const recovered = approveRunAndPreparePublication(state, finalRun.id, "owner", clock);
+
+    expect(recovered.alreadyApplied).toBe(true);
+    expect(recovered.publicationPrepared).toBe(true);
+    expect(recovered.campaign.stage).toBe("publication_pending_confirmation");
   });
 });

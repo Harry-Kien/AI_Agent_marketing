@@ -7,7 +7,7 @@ import {
   type MarketingAgentOutput
 } from "../src/integrations/aiProvider";
 import {
-  approveRun,
+  approveRunAndPreparePublication,
   completePublication,
   completeRun,
   confirmPublication,
@@ -581,19 +581,21 @@ async function handleWorkflowCommand(
       return;
     }
     const approved = await mutateRuntime(controller, (snapshot) => {
-      const result = approveRun(snapshot.workflow, runId, actorId);
+      const result = approveRunAndPreparePublication(snapshot.workflow, runId, actorId);
       return { snapshot: { ...snapshot, workflow: result.state }, value: result };
     });
-    if (approved.alreadyApplied) {
-      await sendMessage(manager.token, chatId, `${runId} đã được duyệt trước đó; không tạo nhiệm vụ trùng.`);
+    if (approved.publicationPrepared) {
+      const growth = configs.find((item) => item.role === "page-growth") ?? manager;
+      await sendMessage(growth.token, chatId, [
+        `PAGE GROWTH - BẢN XEM TRƯỚC ${approved.campaign.id}`,
+        approved.campaign.publicationPreview ?? "Không tạo được bản xem trước.",
+        "Final đã được duyệt. Hãy đọc đúng nội dung trên rồi nhắn:",
+        `Xác nhận đăng ${approved.campaign.id}`
+      ].join("\n"));
       return;
     }
-    if (!approved.nextRun) {
-      await sendMessage(manager.token, chatId, [
-        `Đã duyệt cổng cuối cho ${approved.campaign.id}.`,
-        "Trạng thái: ready_to_schedule.",
-        "Hệ thống không tự đăng bài, chạy ads hoặc chi tiền."
-      ].join("\n"));
+    if (approved.alreadyApplied) {
+      await sendMessage(manager.token, chatId, `${runId} đã được duyệt trước đó; không tạo nhiệm vụ trùng.`);
       return;
     }
     await sendMessage(manager.token, chatId, [
@@ -716,11 +718,18 @@ async function processUpdate(
   let routedText = message.text;
   if (config.role === "manager" && parsed.command === "natural") {
     const pendingRunIds = listPendingRuns(controller.snapshot.workflow).map((run) => run.id);
+    const approvedFinalRunIdsReadyToSchedule = controller.snapshot.workflow.campaigns
+      .filter((campaign) => campaign.stage === "ready_to_schedule")
+      .map((campaign) => controller.snapshot.workflow.runs.find(
+        (run) => run.campaignId === campaign.id && run.stage === "final" && run.status === "approved"
+      )?.id)
+      .filter((id): id is string => Boolean(id));
     const rejectedRunIds = controller.snapshot.workflow.runs
       .filter((run) => run.status === "rejected")
       .map((run) => run.id);
     const decision = await resolveManagerIntent(message.text, {
       pendingRunIds,
+      approvedFinalRunIdsReadyToSchedule,
       rejectedRunIds,
       campaignIds: controller.snapshot.workflow.campaigns.map((campaign) => campaign.id)
     });

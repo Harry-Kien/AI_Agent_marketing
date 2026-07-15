@@ -365,6 +365,50 @@ export function approveRun(
   return { state, campaign, run, nextRun, alreadyApplied: false as const };
 }
 
+export function approveRunAndPreparePublication(
+  current: MarketingWorkflowState,
+  runId: string,
+  actorId: string,
+  now: Clock = () => new Date().toISOString()
+) {
+  const existing = requireRun(current, runId);
+  if (existing.status === "approved") {
+    const state = cloneState(current);
+    const run = requireRun(state, runId);
+    const campaign = requireCampaign(state, run.campaignId);
+    if (run.stage === "final" && campaign.stage === "ready_to_schedule") {
+      const preview = requestPublicationConfirmation(state, campaign.id, actorId, now);
+      return {
+        state: preview.state,
+        campaign: preview.campaign,
+        run,
+        alreadyApplied: true as const,
+        publicationPrepared: true as const
+      };
+    }
+    return {
+      state,
+      campaign,
+      run,
+      alreadyApplied: true as const,
+      publicationPrepared: false as const
+    };
+  }
+
+  const approved = approveRun(current, runId, actorId, now);
+  if (approved.nextRun) {
+    return { ...approved, publicationPrepared: false as const };
+  }
+  const finalCampaign = requireCampaign(approved.state, existing.campaignId);
+  const preview = requestPublicationConfirmation(approved.state, finalCampaign.id, actorId, now);
+  return {
+    ...approved,
+    state: preview.state,
+    campaign: preview.campaign,
+    publicationPrepared: true as const
+  };
+}
+
 export function rejectRun(
   current: MarketingWorkflowState,
   runId: string,

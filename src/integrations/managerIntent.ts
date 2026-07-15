@@ -13,6 +13,7 @@ export type ManagerIntent =
 
 export interface ManagerConversationContext {
   pendingRunIds: string[];
+  approvedFinalRunIdsReadyToSchedule?: string[];
   rejectedRunIds?: string[];
   campaignIds?: string[];
 }
@@ -59,7 +60,10 @@ export async function resolveManagerIntent(
   const explicitCampaign = pickId(text, "CMP");
 
   if (/^(duyệt|đồng ý|ok|approve)(\s|$)/i.test(lower)) {
-    return explicitRun ? { intent: "approve", confidence: 0.99, runId: explicitRun } : singleOrClarify(context.pendingRunIds, "approve");
+    const candidates = context.pendingRunIds.length
+      ? context.pendingRunIds
+      : context.approvedFinalRunIdsReadyToSchedule ?? [];
+    return explicitRun ? { intent: "approve", confidence: 0.99, runId: explicitRun } : singleOrClarify(candidates, "approve");
   }
   if (/^(không duyệt|từ chối|reject)(\s|$)/i.test(lower)) {
     const target = explicitRun ? { intent: "reject" as const, confidence: 0.99, runId: explicitRun } : singleOrClarify(context.pendingRunIds, "reject");

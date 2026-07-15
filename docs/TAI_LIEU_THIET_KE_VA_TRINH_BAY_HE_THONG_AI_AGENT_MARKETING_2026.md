@@ -127,7 +127,7 @@ flowchart LR
 |---|---|
 | Actor chính | Operator |
 | Tiền điều kiện | Final Run ở `pending_approval` và có `publication_content` |
-| Luồng chính | Operator xem Final → gửi “Duyệt” → workflow chuyển `ready_to_schedule` |
+| Luồng chính | Operator xem Final → gửi “Duyệt” → workflow tự tạo publication preview |
 | Quy tắc | “Duyệt” chỉ tự chọn khi có đúng một run chờ; nếu nhiều run phải chỉ rõ ID |
 | Hậu điều kiện | Final run `approved`, audit ghi người duyệt và thời điểm |
 
@@ -300,9 +300,8 @@ sequenceDiagram
     M->>AI: Tổng hợp Final + publication_content
     M-->>Admin: Final Package chờ duyệt
     Admin->>M: Duyệt
-    M->>S: ready_to_schedule
-    Admin->>M: Lên lịch chiến dịch
-    M->>G: Tạo preview từ publication_content
+    M->>S: Final approved và tự tạo preview
+    M->>G: Bàn giao preview từ publication_content
     G-->>Admin: Bản xem trước nguyên văn
     Admin->>M: Xác nhận đăng
     M->>FB: POST /PAGE_ID/feed
@@ -359,9 +358,7 @@ sequenceDiagram
     O->>M: Duyệt Final Package
     M->>W: approve(finalRunId)
     W->>W: Kiểm tra publication_content
-    W-->>M: ready_to_schedule
-    O->>M: Lên lịch chiến dịch
-    M->>W: requestPublicationConfirmation
+    W->>W: Tự gọi requestPublicationConfirmation
     W->>G: Tạo preview từ Final đã duyệt
     G-->>O: Hiển thị nguyên văn bài sẽ đăng
     O->>M: Xác nhận đăng Campaign ID
@@ -676,10 +673,9 @@ Hãy tạo một chiến dịch kiểm thử Facebook giới thiệu giải phá
 3. Dashboard chuyển stage và ghi AUTO-HANDOFF.
 4. Final Package có `NỘI DUNG XUẤT BẢN`.
 5. Operator nhắn “Duyệt”.
-6. Operator nhắn “Lên lịch chiến dịch này”.
-7. Page Growth hiển thị exact preview.
-8. Chỉ khi Operator nhắn “Xác nhận đăng” Meta mới được gọi.
-9. Bot trả postId/permalink; dashboard hiển thị evidence.
+6. Page Growth tự hiển thị exact preview ngay sau khi Final được duyệt.
+7. Chỉ khi Operator nhắn “Xác nhận đăng” Meta mới được gọi.
+8. Bot trả postId/permalink; dashboard hiển thị evidence.
 
 ## 26. Tiêu chí chấp nhận
 

@@ -40,9 +40,8 @@ sequenceDiagram
     M->>AI: Tổng hợp Final Package
     M-->>Admin: Final Package chờ duyệt
     Admin->>M: Duyệt Final
-    M->>DB: ready_to_schedule
-    Admin->>M: Chuẩn bị đăng
-    M->>G: Tạo lịch và publication preview
+    M->>DB: Final approved, tự tạo publication preview
+    M->>G: Bàn giao exact publication content
     G-->>Admin: Bản xem trước chính xác
     Admin->>M: Xác nhận đăng lần cuối
     M->>DB: Kiểm tra approval evidence + feature flag
@@ -84,11 +83,10 @@ Không cần duyệt Research, Content, Creative hoặc Brand. Nếu một packa
 
 ```text
 Tình hình chiến dịch thế nào?
-Chuẩn bị đăng CMP-<ID vừa tạo>
 Xác nhận đăng CMP-<ID vừa tạo>
 ```
 
-Ở cấu hình production có kiểm soát, Page Growth phải hiển thị đúng `publication_content` trong Final Package. Chỉ sau câu xác nhận cuối của Operator, Meta Graph mới được gọi; kết quả thành công phải trả về `postId` làm bằng chứng. Nếu feature flag tắt hoặc credential không hợp lệ, hệ thống phải dừng và không thay đổi trạng thái thành `published`.
+Ở cấu hình production có kiểm soát, duyệt Final tự động tạo preview và Page Growth phải hiển thị đúng `publication_content` trong Final Package. Không cần thêm lệnh “Chuẩn bị đăng”. Chỉ sau câu xác nhận cuối của Operator, Meta Graph mới được gọi; kết quả thành công phải trả về `postId` làm bằng chứng. Nếu feature flag tắt hoặc credential không hợp lệ, hệ thống phải dừng và không thay đổi trạng thái thành `published`.
 
 Nếu Meta lỗi sau bước xác nhận, campaign chuyển sang `failed`, ghi `publication_failed` vào Audit và không tự retry để tránh đăng trùng. Operator phải đối soát Fanpage trước khi tạo lần xuất bản tiếp theo.
 

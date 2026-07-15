@@ -25,7 +25,7 @@ Admin chat mục tiêu
   -> Content Strategy & Creative tạo Creative Package -> Policy Engine kiểm tra và tự bàn giao
   -> Brand & Performance kiểm định -> Policy Engine kiểm tra và tự bàn giao
   -> Manager tạo Final Package -> Admin duyệt
-  -> Page Growth lấy đúng publication_content đã duyệt để tạo publication preview
+  -> Page Growth tự lấy đúng publication_content đã duyệt và gửi publication preview
   -> Admin xác nhận lần cuối
   -> Meta Graph publish có bằng chứng -> đo lường -> đề xuất tối ưu
 ```
@@ -90,7 +90,6 @@ Duyệt.
 Không duyệt vì CTA chưa rõ và thiếu bằng chứng.
 Sửa lại theo hướng có một CTA đặt lịch duy nhất.
 Tình hình chiến dịch thế nào?
-Chuẩn bị đăng chiến dịch CMP-...
 Xác nhận đăng CMP-...
 ```
 
