@@ -367,7 +367,10 @@ async function runWorkflowStage(
       run.id,
       output.text,
       () => new Date().toISOString(),
-      { fallbackReason: output.fallbackReason }
+      {
+        fallbackReason: output.fallbackReason,
+        publicationContent: run.stage === "final" ? output.product.publication_content : undefined
+      }
     );
     return {
       snapshot: { ...snapshot, workflow: completed.state },

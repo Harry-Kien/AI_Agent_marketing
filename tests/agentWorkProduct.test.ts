@@ -9,7 +9,8 @@ const valid = {
   evidence: ["Brief chiến dịch do Admin cung cấp"],
   recommendation: "approve_with_conditions",
   approval_question: "Duyệt hướng định vị này để chuyển sang Content?",
-  quality_score: 86
+  quality_score: 86,
+  publication_content: "AI Agent giúp doanh nghiệp chuẩn hóa công việc. Đăng ký tư vấn để nhận lộ trình phù hợp."
 };
 
 describe("structured agent work product", () => {
@@ -21,6 +22,7 @@ describe("structured agent work product", () => {
     expect(text).toContain("ĐIỂM CHẤT LƯỢNG: 86/100");
     expect(text).toContain("DELIVERABLES");
     expect(text).toContain("CHỜ QUYẾT ĐỊNH");
+    expect(text).toContain("NỘI DUNG XUẤT BẢN");
   });
 
   it("accepts JSON inside a markdown code fence", () => {

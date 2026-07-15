@@ -88,7 +88,7 @@ Chuẩn bị đăng CMP-<ID vừa tạo>
 Xác nhận đăng CMP-<ID vừa tạo>
 ```
 
-Ở cấu hình an toàn hiện tại, câu cuối phải trả rằng Meta publish đang khóa. Đây là kết quả đúng: hệ thống đã ghi nhận ý định nhưng không đăng khi credential chưa được rotate và feature flag chưa bật.
+Ở cấu hình production có kiểm soát, Page Growth phải hiển thị đúng `publication_content` trong Final Package. Chỉ sau câu xác nhận cuối của Operator, Meta Graph mới được gọi; kết quả thành công phải trả về `postId` làm bằng chứng. Nếu feature flag tắt hoặc credential không hợp lệ, hệ thống phải dừng và không thay đổi trạng thái thành `published`.
 
 ## 3. Tiêu chí đạt
 

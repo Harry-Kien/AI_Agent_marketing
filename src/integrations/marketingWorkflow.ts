@@ -54,6 +54,7 @@ export interface MarketingAgentRunRuntime {
   parentRunId?: string;
   revisionFeedback?: string;
   fallbackReason?: string;
+  publicationContent?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -268,7 +269,7 @@ export function completeRun(
   runId: string,
   output: string,
   now: Clock = () => new Date().toISOString(),
-  options: { fallbackReason?: string } = {}
+  options: { fallbackReason?: string; publicationContent?: string } = {}
 ) {
   if (!output.trim()) throw new Error("Run output is required.");
   const state = cloneState(current);
@@ -282,6 +283,7 @@ export function completeRun(
   run.output = output.trim();
   run.status = "pending_approval";
   run.fallbackReason = options.fallbackReason;
+  run.publicationContent = options.publicationContent?.trim() || undefined;
   run.updatedAt = timestamp;
   campaign.stage = pendingStages[run.stage];
   campaign.updatedAt = timestamp;
@@ -471,8 +473,14 @@ export function requestPublicationConfirmation(
     throw new Error(`Campaign ${campaign.id} must be ready_to_schedule.`);
   }
   const timestamp = now();
+  const approvedFinalRun = state.runs.find(
+    (run) => run.campaignId === campaign.id && run.stage === "final" && run.status === "approved"
+  );
+  if (!approvedFinalRun?.publicationContent) {
+    throw new Error(`Campaign ${campaign.id} has no approved final publication content.`);
+  }
   campaign.stage = "publication_pending_confirmation";
-  campaign.publicationPreview = `Bản xem trước xuất bản: ${campaign.brief}`;
+  campaign.publicationPreview = `Bản xem trước xuất bản:\n${approvedFinalRun.publicationContent}`;
   campaign.updatedAt = timestamp;
   audit(state, {
     campaignId: campaign.id,

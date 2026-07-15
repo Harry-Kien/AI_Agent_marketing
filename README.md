@@ -25,7 +25,8 @@ Admin chat mục tiêu
   -> Content Strategy & Creative tạo Creative Package -> Policy Engine kiểm tra và tự bàn giao
   -> Brand & Performance kiểm định -> Policy Engine kiểm tra và tự bàn giao
   -> Manager tạo Final Package -> Admin duyệt
-  -> Page Growth tạo publication preview -> Admin xác nhận lần cuối
+  -> Page Growth lấy đúng publication_content đã duyệt để tạo publication preview
+  -> Admin xác nhận lần cuối
   -> Meta Graph publish có bằng chứng -> đo lường -> đề xuất tối ưu
 ```
 
@@ -94,6 +95,8 @@ Xác nhận đăng CMP-...
 ```
 
 Ở chế độ enterprise, `Duyệt` thường chỉ xuất hiện tại Final Package. Research, Content, Creative và Brand tự bàn giao khi đạt điểm từ 80 với recommendation `approve`, hoặc từ 70 với `approve_with_conditions`. Package `revise` được tự sửa một lần; điều kiện còn lại được Brand/Manager xử lý và đưa vào Final. Rủi ro pháp lý, dữ liệu cá nhân, tài chính, khiếu nại hoặc khủng hoảng vẫn bị escalation. `Duyệt` chỉ tự chọn khi đúng một RUN đang chờ; nếu có 0 hoặc nhiều RUN, Manager hỏi lại mã cụ thể. Các lệnh slash vẫn được giữ làm phương án dự phòng.
+
+Final Package bắt buộc có `publication_content`: nguyên văn bài Facebook sẽ được đăng. Workflow từ chối tạo lịch nếu thiếu trường này, vì vậy Meta không thể nhận nhầm brief, checklist hoặc báo cáo nội bộ.
 
 ## Chăm sóc khách hàng
 

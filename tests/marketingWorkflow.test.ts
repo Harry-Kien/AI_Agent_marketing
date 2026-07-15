@@ -182,13 +182,24 @@ describe("enterprise marketing workflow", () => {
     }).state;
     for (const stage of ["research", "content", "creative", "brand", "final"] as const) {
       const run = state.runs.find((item) => item.status === "running" && item.stage === stage)!;
-      state = completeRun(state, run.id, `${stage} package`, clock).state;
+      state = completeRun(
+        state,
+        run.id,
+        `${stage} package`,
+        clock,
+        stage === "final"
+          ? { publicationContent: "Bai Facebook cuoi cung da qua kiem dinh.\n\nDang ky tu van ngay." }
+          : {}
+      ).state;
       state = approveRun(state, run.id, "owner", clock).state;
     }
 
     const preview = requestPublicationConfirmation(state, state.campaigns[0].id, "owner", clock);
     expect(preview.campaign.stage).toBe("publication_pending_confirmation");
-    expect(preview.campaign.publicationPreview).toContain("Campaign publication guard");
+    expect(preview.campaign.publicationPreview).toBe(
+      "Bản xem trước xuất bản:\nBai Facebook cuoi cung da qua kiem dinh.\n\nDang ky tu van ngay."
+    );
+    expect(preview.campaign.publicationPreview).not.toContain("Campaign publication guard");
 
     const confirmed = confirmPublication(preview.state, preview.campaign.id, "owner", clock);
     expect(confirmed.campaign.stage).toBe("publishing");

@@ -33,9 +33,16 @@ describe("golden enterprise marketing sequence", () => {
       observedRoles.push(run.role);
       const output = await generateMarketingAgentOutput(
         { enabled: false, baseUrl: "local", apiKey: "", model: "mock" },
-        { role: run.role, command: stage, topic: state.campaigns[0].brief, context: run.input }
+        {
+          role: run.role,
+          command: stage === "final" ? "finalize" : stage,
+          topic: state.campaigns[0].brief,
+          context: run.input
+        }
       );
-      state = completeRun(state, run.id, output.text).state;
+      state = completeRun(state, run.id, output.text, undefined, {
+        publicationContent: stage === "final" ? output.product.publication_content : undefined
+      }).state;
 
       if (stage === "content") {
         state = rejectRun(state, run.id, "CTA chưa gắn với lịch tư vấn", "operator").state;

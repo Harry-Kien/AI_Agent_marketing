@@ -139,6 +139,7 @@ export function createAiProviderConfig(env: EnvLike): AiProviderConfig {
 
 export function buildMarketingPrompt(input: MarketingPromptInput): MarketingPrompt {
   const profile = roleSkills[input.role];
+  const isFinalPackage = input.role === "manager" && input.command === "finalize";
   return {
     system: [
       `Bạn là ${profile.name}.`,
@@ -159,7 +160,10 @@ export function buildMarketingPrompt(input: MarketingPromptInput): MarketingProm
       `Chủ đề: ${input.topic}`,
       `Bối cảnh: ${input.context ?? "AI Marketing Command Center vận hành qua Telegram."}`,
       "Trả về duy nhất một JSON object hợp lệ, không dùng code fence và không thêm giải thích ngoài JSON.",
-      "Schema bắt buộc: summary:string; deliverables:string[2..8]; checks:string[1..8]; risks:string[1..6]; evidence:string[1..8]; recommendation:approve|approve_with_conditions|revise|reject; approval_question:string; quality_score:integer 60..100.",
+      "Schema bắt buộc: summary:string; deliverables:string[2..8]; checks:string[1..8]; risks:string[1..6]; evidence:string[1..8]; recommendation:approve|approve_with_conditions|revise|reject; approval_question:string; quality_score:integer 60..100; publication_content?:string.",
+      isFinalPackage
+        ? "Với /finalize, publication_content là bắt buộc: viết nguyên văn một bài Facebook hoàn chỉnh, có hook, giá trị, CTA; không chứa báo cáo nội bộ, điểm chất lượng, checklist, hướng dẫn cho Admin hoặc Markdown thô. Đây chính là nội dung sẽ xuất hiện trong bản xem trước trước khi người vận hành xác nhận đăng."
+        : "Chỉ thêm publication_content khi vai trò hiện tại thực sự bàn giao một bản nội dung có thể xuất bản.",
       "Evidence phải nói rõ nguồn nào đến từ brief, dữ liệu đã duyệt hoặc giả định; không được bịa nguồn bên ngoài.",
       "Quality score phản ánh mức đầy đủ và độ tin cậy, không mặc định cho điểm cao.",
       "Chọn recommendation approve khi package đã đầy đủ và không có blocker; chỉ dùng approve_with_conditions hoặc revise khi có điều kiện cụ thể cần xử lý.",
@@ -225,6 +229,9 @@ export async function generateMarketingAgentOutput(
 
       const parsed = parseAgentWorkProduct(text);
       if (!parsed.success) throw new Error("AI provider returned output that failed schema validation");
+      if (input.role === "manager" && input.command === "finalize" && !parsed.data.publication_content) {
+        throw new Error("AI provider returned output that failed schema validation: final publication_content is missing");
+      }
       return { mode: "ai", text: formatAgentWorkProduct(parsed.data), product: parsed.data };
     } catch (error) {
       lastError = normalizeProviderError(error);
@@ -278,7 +285,11 @@ function buildMockProduct(input: MarketingPromptInput): AgentWorkProduct {
     evidence: [`Brief do người quản lý cung cấp: ${input.topic}`],
     recommendation: "approve_with_conditions",
     approval_question: "Bạn có duyệt gói mô phỏng này để chuyển sang cổng tiếp theo không?",
-    quality_score: 68
+    quality_score: 68,
+    publication_content:
+      input.role === "manager" && input.command === "finalize"
+        ? `AI Agent cho doanh nghiệp: ${input.topic}\n\nGiải pháp phù hợp cần bắt đầu từ quy trình thực tế, có người kiểm soát và đo lường rõ ràng.\n\nĐăng ký tư vấn để nhận lộ trình triển khai phù hợp.`
+        : undefined
   };
   return product;
 }

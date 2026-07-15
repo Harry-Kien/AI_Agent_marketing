@@ -64,6 +64,19 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     expect(prompt.user).not.toContain("Lark");
   });
 
+  it("requires the final manager package to include the exact Facebook publication copy", () => {
+    const prompt = buildMarketingPrompt({
+      role: "manager",
+      command: "finalize",
+      topic: "AI Agent cho SME",
+      context: "Các package chuyên môn đã được duyệt nội bộ"
+    });
+
+    expect(prompt.user).toContain("publication_content");
+    expect(prompt.user).toContain("bài Facebook hoàn chỉnh");
+    expect(prompt.user).toContain("không chứa báo cáo nội bộ");
+  });
+
   it("keeps creative production and community growth responsibilities separate", () => {
     const creative = buildMarketingPrompt({
       role: "creative-production",
