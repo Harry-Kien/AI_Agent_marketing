@@ -25,6 +25,7 @@ export interface MarketingPrompt {
 export interface MarketingAgentOutput {
   mode: "ai" | "mock";
   text: string;
+  product: AgentWorkProduct;
   fallbackReason?: string;
 }
 
@@ -148,6 +149,7 @@ export function buildMarketingPrompt(input: MarketingPromptInput): MarketingProm
       "Bạn làm việc trong một hệ vận hành marketing human-in-the-loop.",
       "Không được khẳng định rằng nội dung đã được đăng, tiền đã được chi, hoặc hệ thống bên ngoài đã bị thay đổi.",
       "Trả lời đúng trọng tâm nhiệm vụ của vai trò hiện tại, không lặp lại phần của bot khác.",
+      "Bàn giao nội bộ giữa Research, Content, Creative và Brand có thể được Policy Engine tự duyệt; đây không phải hành động xuất bản ra bên ngoài.",
       "Trả lời bằng tiếng Việt, gọn, có cấu trúc, phù hợp để hiển thị trong Telegram.",
       "Tuyệt đối không dùng Markdown thô như **, ###, [] hoặc bảng. Dùng tiêu đề ngắn và bullet thường.",
       "Giữ câu trả lời trong 900-1200 ký tự, ưu tiên quyết định và hành động tiếp theo."
@@ -160,6 +162,7 @@ export function buildMarketingPrompt(input: MarketingPromptInput): MarketingProm
       "Schema bắt buộc: summary:string; deliverables:string[2..8]; checks:string[1..8]; risks:string[1..6]; evidence:string[1..8]; recommendation:approve|approve_with_conditions|revise|reject; approval_question:string; quality_score:integer 60..100.",
       "Evidence phải nói rõ nguồn nào đến từ brief, dữ liệu đã duyệt hoặc giả định; không được bịa nguồn bên ngoài.",
       "Quality score phản ánh mức đầy đủ và độ tin cậy, không mặc định cho điểm cao.",
+      "Chọn recommendation approve khi package đã đầy đủ và không có blocker; chỉ dùng approve_with_conditions hoặc revise khi có điều kiện cụ thể cần xử lý.",
       "Nhắc lại: mọi hành động launch, đăng bài, chạy ads hoặc gửi ra ngoài đều cần con người phê duyệt."
     ].join("\n")
   };
@@ -172,9 +175,11 @@ export async function generateMarketingAgentOutput(
 ): Promise<MarketingAgentOutput> {
   const prompt = buildMarketingPrompt(input);
   if (!config.enabled) {
+    const product = buildMockProduct(input);
     return {
       mode: "mock",
-      text: buildMockOutput(input)
+      text: formatAgentWorkProduct(product),
+      product
     };
   }
 
@@ -220,7 +225,7 @@ export async function generateMarketingAgentOutput(
 
       const parsed = parseAgentWorkProduct(text);
       if (!parsed.success) throw new Error("AI provider returned output that failed schema validation");
-      return { mode: "ai", text: formatAgentWorkProduct(parsed.data) };
+      return { mode: "ai", text: formatAgentWorkProduct(parsed.data), product: parsed.data };
     } catch (error) {
       lastError = normalizeProviderError(error);
       if (attempt < maxRetries) {
@@ -229,9 +234,11 @@ export async function generateMarketingAgentOutput(
     }
   }
 
+  const product = buildMockProduct(input);
   return {
     mode: "mock",
-    text: buildMockOutput(input),
+    text: formatAgentWorkProduct(product),
+    product,
     fallbackReason: lastError
   };
 }
@@ -261,7 +268,7 @@ function readNonNegativeInteger(value: string | undefined, fallback: number) {
   return Number.isInteger(parsed) && parsed >= 0 ? parsed : fallback;
 }
 
-function buildMockOutput(input: MarketingPromptInput) {
+function buildMockProduct(input: MarketingPromptInput): AgentWorkProduct {
   const profile = roleSkills[input.role];
   const product: AgentWorkProduct = {
     summary: `${profile.name} tạo gói mô phỏng có cấu trúc cho chủ đề ${input.topic}.`,
@@ -273,5 +280,5 @@ function buildMockOutput(input: MarketingPromptInput) {
     approval_question: "Bạn có duyệt gói mô phỏng này để chuyển sang cổng tiếp theo không?",
     quality_score: 68
   };
-  return formatAgentWorkProduct(product);
+  return product;
 }

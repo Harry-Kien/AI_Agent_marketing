@@ -45,6 +45,8 @@ import {
 } from "../src/integrations/telegramStateStore";
 import { intentToFallbackCommand, resolveManagerIntent } from "../src/integrations/managerIntent";
 import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
+import { createApprovalPolicyConfig, evaluateApprovalPolicy } from "../src/integrations/approvalPolicy";
+import { applyApprovalPolicyDecision } from "../src/integrations/workflowApproval";
 
 interface TelegramUpdate {
   update_id: number;
@@ -244,6 +246,32 @@ function formatRunResult(run: MarketingAgentRunRuntime, output: MarketingAgentOu
   ].filter(Boolean).join("\n");
 }
 
+function formatAutoHandoff(
+  run: MarketingAgentRunRuntime,
+  output: MarketingAgentOutput,
+  nextRun: MarketingAgentRunRuntime
+) {
+  return [
+    `AUTO-HANDOFF - ${stageLabel(run.stage)} hoàn tất`,
+    `Campaign: ${run.campaignId}`,
+    `Điểm chất lượng: ${output.product.quality_score}/100`,
+    `Khuyến nghị: ${output.product.recommendation}`,
+    `Tóm tắt: ${output.product.summary}`,
+    `Bàn giao sang: ${roleLabel(nextRun.role)} - ${stageLabel(nextRun.stage)}`,
+    "Admin không cần thao tác ở bước nội bộ này."
+  ].join("\n");
+}
+
+function formatAutoRevision(run: MarketingAgentRunRuntime, output: MarketingAgentOutput, reason: string) {
+  return [
+    `AUTO-REVISION - ${stageLabel(run.stage)} chưa đạt policy`,
+    `Campaign: ${run.campaignId}`,
+    `Điểm chất lượng: ${output.product.quality_score}/100`,
+    `Lý do: ${reason}`,
+    "Policy Engine đã tự yêu cầu Agent sửa một lần; Admin chưa cần thao tác."
+  ].join("\n");
+}
+
 function formatCampaignStatus(campaign: MarketingCampaignRuntime, runs: MarketingAgentRunRuntime[]) {
   const campaignRuns = runs.filter((run) => run.campaignId === campaign.id);
   return [
@@ -321,7 +349,7 @@ async function runWorkflowStage(
     `${roleLabel(run.role)} đã nhận nhiệm vụ ${stageLabel(run.stage)}.`,
     `Campaign: ${campaign.id}`,
     `Run: ${run.id}`,
-    "Đang xử lý đầu vào đã được duyệt từ cổng trước."
+    "Đang xử lý đầu vào đã được bàn giao từ cổng trước."
   ].join("\n"));
   await sendTyping(target.token, chatId);
   await wait(700);
@@ -346,8 +374,51 @@ async function runWorkflowStage(
       value: completed.run
     };
   });
+  const revisionCount = Math.max(
+    0,
+    controller.snapshot.workflow.runs.filter(
+      (item) => item.campaignId === completedRun.campaignId && item.stage === completedRun.stage
+    ).length - 1
+  );
+  const policyDecision = evaluateApprovalPolicy({
+    config: createApprovalPolicyConfig(process.env),
+    stage: completedRun.stage,
+    product: output.product,
+    outputMode: output.mode,
+    fallbackReason: output.fallbackReason,
+    revisionCount
+  });
+
+  if (policyDecision.action === "human_approval") {
+    await sendTyping(target.token, chatId);
+    await sendMessage(target.token, chatId, formatRunResult(completedRun, output));
+    return;
+  }
+
+  const applied = await mutateRuntime(controller, (snapshot) => {
+    const result = applyApprovalPolicyDecision(snapshot.workflow, completedRun.id, policyDecision);
+    return { snapshot: { ...snapshot, workflow: result.state }, value: result };
+  });
+
+  if (policyDecision.action === "escalate" || !applied.nextRun) {
+    await sendTyping(target.token, chatId);
+    await sendMessage(target.token, chatId, [
+      formatRunResult(completedRun, output),
+      "",
+      `ESCALATION: ${policyDecision.reason}`
+    ].join("\n"));
+    return;
+  }
+
   await sendTyping(target.token, chatId);
-  await sendMessage(target.token, chatId, formatRunResult(completedRun, output));
+  await sendMessage(
+    target.token,
+    chatId,
+    policyDecision.action === "auto_revise"
+      ? formatAutoRevision(completedRun, output, policyDecision.reason)
+      : formatAutoHandoff(completedRun, output, applied.nextRun)
+  );
+  await runWorkflowStage(applied.nextRun.id, chatId, configs, controller);
 }
 
 async function handleWorkflowCommand(
@@ -375,9 +446,12 @@ async function handleWorkflowCommand(
       });
       return { snapshot: { ...snapshot, workflow: result.state }, value: result };
     });
+    const approvalMode = createApprovalPolicyConfig(process.env).mode;
     await sendMessage(manager.token, chatId, [
       `Đã mở chiến dịch ${created.campaign.id}.`,
-      "Quy trình Stage-Gate: Research → duyệt → Content Strategy → duyệt → Creative → duyệt → Brand & KPI → duyệt → Final → duyệt.",
+      approvalMode === "enterprise-risk-based"
+        ? "Chế độ Enterprise: Research → Content → Creative → Brand tự bàn giao theo policy. Bạn chỉ duyệt Final Package và xác nhận xuất bản."
+        : "Chế độ Strict Stage-Gate: mỗi phòng ban đều chờ Admin duyệt.",
       `Market Radar đang nhận run ${created.run.id}.`
     ].join("\n"));
     await runWorkflowStage(created.run.id, chatId, configs, controller);

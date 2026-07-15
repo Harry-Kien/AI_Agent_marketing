@@ -23,29 +23,20 @@ sequenceDiagram
     M->>R: Giao brief nghiên cứu
     R->>AI: Yêu cầu insight theo vai trò
     AI-->>R: Research Package
-    R->>DB: Lưu output, trạng thái pending_approval
-    R-->>Admin: Trả kết quả + mã RUN
-    Admin->>M: Duyệt / không duyệt / yêu cầu sửa
-    M->>DB: Ghi quyết định và audit
-
-    alt Research được duyệt
-        M->>C: Bàn giao brief + research đã duyệt
-        C->>AI: Tạo Content Package
-        AI-->>C: Hook, copy, CTA
-        C-->>Admin: Chờ duyệt Content RUN
-    else Research bị từ chối
-        M->>R: Giao revision kèm lý do
-    end
-
-    Admin->>M: Duyệt Content
-    M->>P: Bàn giao Content Package
+    R->>DB: Lưu output + quality score
+    DB->>DB: Policy Engine kiểm tra rủi ro
+    DB-->>R: AUTO-HANDOFF nếu đạt policy
+    R->>C: Bàn giao Research Package
+    C->>AI: Tạo Content Package
+    AI-->>C: Hook, copy, CTA
+    C->>DB: Lưu output + policy decision
+    C->>P: AUTO-HANDOFF Content Package
     P->>AI: Tạo Creative Package
-    P-->>Admin: Visual brief + storyboard chờ duyệt
-    Admin->>M: Duyệt Creative
-    M->>B: Bàn giao toàn bộ evidence đã duyệt
+    P->>DB: Lưu visual brief + storyboard
+    P->>B: AUTO-HANDOFF Creative Package
     B->>AI: Review brand, claim, CTA, KPI
-    B-->>Admin: Quality Gate chờ duyệt
-    Admin->>M: Duyệt Brand
+    B->>DB: Lưu Quality Gate
+    B->>M: AUTO-HANDOFF Brand Package
     M->>AI: Tổng hợp Final Package
     M-->>Admin: Final Package chờ duyệt
     Admin->>M: Duyệt Final
@@ -60,6 +51,11 @@ sequenceDiagram
     M->>DB: Lưu bằng chứng published
     G->>FB: Đọc metrics
     G-->>Admin: Báo cáo và đề xuất tối ưu
+
+    opt Package nội bộ không đạt policy
+        DB->>DB: Auto-revision tối đa một lần
+        DB-->>Admin: Escalate nếu vẫn lỗi hoặc có rủi ro nhạy cảm
+    end
 ```
 
 ## 2. Ví dụ test bằng chat tự nhiên
@@ -73,25 +69,18 @@ Hãy tạo chiến dịch giới thiệu giải pháp AI Agent cho doanh nghiệ
 Kết quả mong đợi:
 
 1. Manager tạo `CMP-...` và `RUN-...-RSH-1`.
-2. Market Intelligence hiện trạng thái đang soạn, trả Research Package và dừng.
-3. Không Agent nào chạy stage sau trước khi Admin duyệt.
+2. Market Intelligence trả Research Package và thông báo `AUTO-HANDOFF`.
+3. Content Creator, Content Strategy & Creative và Brand & Performance tự chạy nối tiếp khi đạt policy.
+4. Manager chỉ dừng ở Final Package để chờ Admin duyệt.
 
-Sau đó lần lượt chat:
+Khi Final Package xuất hiện, chat:
 
 ```text
 Có gì đang chờ tôi duyệt?
 Duyệt
 ```
 
-Sau Content Package, thử nhánh sửa:
-
-```text
-Không duyệt vì CTA còn chung chung, cần một CTA đặt lịch tư vấn duy nhất và thêm ví dụ doanh nghiệp 20 nhân sự.
-Sửa lại theo đúng phản hồi vừa nêu.
-Duyệt
-```
-
-Tiếp tục trả lời `Duyệt` ở Creative, Brand và Final khi mỗi lần chỉ có một RUN đang chờ. Cuối luồng:
+Không cần duyệt Research, Content, Creative hoặc Brand. Nếu một package có điểm thấp, Policy Engine tự revision một lần; điều kiện chưa giải quyết sẽ được chuyển cho Brand/Manager và đưa vào Final. Chỉ recommendation `reject`, lỗi provider hoặc rủi ro nhạy cảm mới dừng luồng. Cuối luồng:
 
 ```text
 Tình hình chiến dịch thế nào?
@@ -103,10 +92,10 @@ Xác nhận đăng CMP-<ID vừa tạo>
 
 ## 3. Tiêu chí đạt
 
-- Mỗi stage chỉ bắt đầu sau khi quyết định trước đó đã lưu thành công.
+- Mỗi stage chỉ bắt đầu sau khi policy decision của stage trước đã lưu thành công.
 - Mỗi output có Campaign ID, Run ID, vai trò, trạng thái và audit event.
 - `Duyệt` mơ hồ không làm thay đổi dữ liệu.
-- Reject bắt buộc có lý do; revision giữ liên kết với run cũ.
+- Auto-revision và reject đều giữ lý do cùng liên kết với run cũ.
 - Nội dung Final không đồng nghĩa đã đăng.
 - Publish cần hai bằng chứng: Final đã duyệt và xác nhận đúng preview.
 - Meta lỗi không được làm mất workflow; lỗi phải được làm sạch, không lộ token.

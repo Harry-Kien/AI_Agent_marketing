@@ -54,10 +54,11 @@ Policy Engine xử lý:
 
 | Điều kiện | Hành động |
 |---|---|
-| Điểm từ 80, recommendation approve, không có rủi ro nhạy cảm | Tự phê duyệt nội bộ và chạy stage kế tiếp |
-| Điểm 60-79 hoặc recommendation needs_revision | Tự mở revision một lần với feedback từ quality gate |
-| Sau revision vẫn không đạt | Chuyển Admin xem xét |
-| Recommendation blocked hoặc có rủi ro bắt buộc | Dừng luồng và chuyển Admin |
+| Điểm từ 80, recommendation `approve`, không có rủi ro nhạy cảm | Tự phê duyệt nội bộ và chạy stage kế tiếp |
+| Điểm từ 70, recommendation `approve_with_conditions`, không có rủi ro nhạy cảm | Tự bàn giao có điều kiện để Brand/Manager xử lý trước Final |
+| Điểm 60-79 hoặc recommendation `approve_with_conditions`/`revise` | Tự mở revision một lần với feedback từ quality gate |
+| Sau revision vẫn chưa đạt nhưng không reject/rủi ro nhạy cảm | Bàn giao có điều kiện cho Brand/Manager và đưa cảnh báo vào Final |
+| Recommendation `reject` hoặc có rủi ro bắt buộc | Dừng luồng và chuyển Admin |
 | Final Package hoàn tất | Luôn chờ Admin duyệt |
 | Publication Preview hoàn tất | Luôn chờ Admin xác nhận riêng |
 
@@ -96,7 +97,7 @@ Policy Engine xử lý:
 1. Campaign thông thường tự chạy Research -> Content -> Creative -> Brand -> Final mà không cần Admin duyệt trung gian.
 2. Admin chỉ thấy một yêu cầu duyệt Final Package và một xác nhận Publication Preview.
 3. Output điểm dưới 80 tự revision tối đa một lần.
-4. Output blocked hoặc chứa rủi ro nhạy cảm dừng và yêu cầu Admin.
+4. Output recommendation `reject` hoặc chứa rủi ro nhạy cảm dừng và yêu cầu Admin.
 5. `strict-stage-gate` vẫn yêu cầu duyệt từng stage.
 6. Restart giữa auto-handoff không tạo run hoặc audit event trùng.
 7. Telegram 6/6, Meta guard, typecheck, build, unit tests và browser smoke tiếp tục đạt.

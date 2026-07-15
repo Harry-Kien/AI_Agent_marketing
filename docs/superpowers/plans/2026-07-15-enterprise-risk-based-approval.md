@@ -10,7 +10,7 @@
 
 ## Global Constraints
 
-- `enterprise-risk-based` là mặc định; `strict-stage-gate` giữ hành vi cũ.
+- `enterprise-risk-based` là mặc định; `strict-stage-gate` giữ hành vi cũ. Package `approve_with_conditions` từ 70 điểm được bàn giao nội bộ để Brand/Manager xử lý trước Final.
 - Research, Content, Creative và Brand có thể tự bàn giao; Final luôn chờ Admin.
 - Publication luôn cần xác nhận riêng của Admin.
 - Output fallback/mock, sai schema hoặc có rủi ro nhạy cảm không được tự duyệt.

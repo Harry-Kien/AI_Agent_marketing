@@ -142,6 +142,24 @@ describe("enterprise marketing workflow", () => {
     expect(second.state.runs).toHaveLength(2);
   });
 
+  it("records policy-engine approvals as system audit events", () => {
+    const created = createCampaign(createEmptyWorkflowState(), {
+      brief: "Campaign auto handoff",
+      createdBy: "owner",
+      now: clock,
+      idSuffix: "AUTO"
+    });
+    const completed = completeRun(created.state, created.run.id, "Research package", clock);
+    const approved = approveRun(completed.state, created.run.id, "policy-engine", clock, {
+      actorType: "system",
+      auditAction: "run_auto_approved"
+    });
+    const event = approved.state.auditEvents.find(({ action }) => action === "run_auto_approved");
+
+    expect(event).toMatchObject({ actorType: "system", actorId: "policy-engine" });
+    expect(approved.nextRun?.stage).toBe("content");
+  });
+
   it("does not allow incomplete or out-of-order runs to be approved", () => {
     const created = createCampaign(createEmptyWorkflowState(), {
       brief: "Campaign guarded",

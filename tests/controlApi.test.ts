@@ -9,9 +9,13 @@ import { createRuntimeSnapshot } from "../src/integrations/telegramStateStore";
 describe("local control API read model", () => {
   it("exposes six agents and a redacted campaign view", () => {
     const workflow = createCampaign(createEmptyWorkflowState(), { brief: "AI cho SME", createdBy: "owner", idSuffix: "API" }).state;
-    const model = buildOfficeReadModel(createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow }));
+    const model = buildOfficeReadModel(
+      createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow }),
+      { MARKETING_APPROVAL_MODE: "enterprise-risk-based" }
+    );
     expect(model.agents).toHaveLength(6);
     expect(model.campaignTitle).toBe("AI cho SME");
+    expect(model.services.find(({ name }) => name === "Human approval")?.detail).toBe("Final + xuất bản");
     expect(JSON.stringify(model)).not.toContain("TOKEN");
   });
 

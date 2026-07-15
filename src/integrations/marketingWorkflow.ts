@@ -63,8 +63,11 @@ export type MarketingAuditAction =
   | "task_assigned"
   | "run_completed"
   | "run_approved"
+  | "run_auto_approved"
   | "run_rejected"
   | "revision_started"
+  | "auto_revision_started"
+  | "risk_escalated"
   | "provider_fallback"
   | "campaign_ready"
   | "publication_requested"
@@ -90,6 +93,11 @@ export interface MarketingWorkflowState {
 }
 
 type Clock = () => string;
+
+interface AuditActorOptions {
+  actorType?: "human" | "agent" | "system";
+  auditAction?: MarketingAuditAction;
+}
 
 const roles: Record<MarketingRunStage, MarketingBotRole> = {
   research: "market-radar",
@@ -283,7 +291,7 @@ export function completeRun(
     actorType: "agent",
     actorId: run.role,
     action: "run_completed",
-    summary: `${run.stage} package is pending human approval.`,
+    summary: `${run.stage} package is pending approval policy decision.`,
     createdAt: timestamp
   });
   if (options.fallbackReason) {
@@ -304,7 +312,8 @@ export function approveRun(
   current: MarketingWorkflowState,
   runId: string,
   actorId: string,
-  now: Clock = () => new Date().toISOString()
+  now: Clock = () => new Date().toISOString(),
+  options: AuditActorOptions = {}
 ) {
   const existing = requireRun(current, runId);
   if (existing.status === "approved") {
@@ -326,9 +335,9 @@ export function approveRun(
   audit(state, {
     campaignId: campaign.id,
     runId: run.id,
-    actorType: "human",
+    actorType: options.actorType ?? "human",
     actorId,
-    action: "run_approved",
+    action: options.auditAction ?? "run_approved",
     summary: `Approved ${run.stage} package.`,
     createdAt: timestamp
   });
@@ -358,7 +367,8 @@ export function rejectRun(
   runId: string,
   reason: string,
   actorId: string,
-  now: Clock = () => new Date().toISOString()
+  now: Clock = () => new Date().toISOString(),
+  options: AuditActorOptions = {}
 ) {
   if (!reason.trim()) throw new Error("A rejection reason is required.");
   const state = cloneState(current);
@@ -377,9 +387,9 @@ export function rejectRun(
   audit(state, {
     campaignId: campaign.id,
     runId: run.id,
-    actorType: "human",
+    actorType: options.actorType ?? "human",
     actorId,
-    action: "run_rejected",
+    action: options.auditAction ?? "run_rejected",
     summary: reason.trim().slice(0, 240),
     createdAt: timestamp
   });
@@ -391,7 +401,8 @@ export function reviseRun(
   runId: string,
   feedback: string,
   actorId: string,
-  now: Clock = () => new Date().toISOString()
+  now: Clock = () => new Date().toISOString(),
+  options: AuditActorOptions = {}
 ) {
   if (!feedback.trim()) throw new Error("Revision feedback is required.");
   const state = cloneState(current);
@@ -411,10 +422,38 @@ export function reviseRun(
   audit(state, {
     campaignId: campaign.id,
     runId: run.id,
-    actorType: "human",
+    actorType: options.actorType ?? "human",
     actorId,
-    action: "revision_started",
+    action: options.auditAction ?? "revision_started",
     summary: feedback.trim().slice(0, 240),
+    createdAt: timestamp
+  });
+  return { state, campaign, run };
+}
+
+export function recordRiskEscalation(
+  current: MarketingWorkflowState,
+  runId: string,
+  reason: string,
+  actorId = "policy-engine",
+  now: Clock = () => new Date().toISOString()
+) {
+  if (!reason.trim()) throw new Error("An escalation reason is required.");
+  const state = cloneState(current);
+  const run = requireRun(state, runId);
+  if (run.status !== "pending_approval") {
+    throw new Error(`Run ${runId} must be pending_approval, current status is ${run.status}.`);
+  }
+  const campaign = requireCampaign(state, run.campaignId);
+  const timestamp = now();
+  campaign.updatedAt = timestamp;
+  audit(state, {
+    campaignId: campaign.id,
+    runId: run.id,
+    actorType: "system",
+    actorId,
+    action: "risk_escalated",
+    summary: reason.trim().slice(0, 240),
     createdAt: timestamp
   });
   return { state, campaign, run };

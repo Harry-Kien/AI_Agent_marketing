@@ -10,7 +10,7 @@ export const officeFallback: OfficeSnapshot = {
     { id: "manager", name: "AI Marketing Manager", department: "Điều phối & phê duyệt", state: "working", task: "Tổng hợp campaign brief", latency: "1.2s" },
     { id: "radar", name: "Market Intelligence", department: "Nghiên cứu thị trường", state: "available", task: "Insight đã bàn giao", latency: "3.8s" },
     { id: "copy", name: "Content Creator", department: "Copywriting & nội dung", state: "available", task: "Content package đã duyệt", latency: "4.5s" },
-    { id: "creative", name: "Content Strategy & Creative", department: "Chiến lược & sáng tạo", state: "waiting_approval", task: "Visual brief đang chờ duyệt", latency: "5.1s" },
+    { id: "creative", name: "Content Strategy & Creative", department: "Chiến lược & sáng tạo", state: "available", task: "Creative Package đã auto-handoff", latency: "5.1s" },
     { id: "brand", name: "Brand & Performance", department: "Kiểm định & KPI", state: "available", task: "Chờ creative package", latency: "-" },
     { id: "growth", name: "Page Growth & Community", department: "Page & CSKH", state: "available", task: "Chờ final package", latency: "-" }
   ],

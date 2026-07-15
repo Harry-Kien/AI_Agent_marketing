@@ -3,6 +3,7 @@ import { resolve } from "node:path";
 import { createAiProviderConfig, generateMarketingAgentOutput } from "../src/integrations/aiProvider";
 import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
 import { getMarketingBotConfigsFromEnv } from "../src/integrations/telegramAdapter";
+import { createApprovalPolicyConfig } from "../src/integrations/approvalPolicy";
 
 function loadDotEnv() {
   const path = resolve(process.cwd(), ".env");
@@ -66,6 +67,7 @@ async function main() {
   } catch { controlApi = false; }
 
   const activeBots = telegram.filter((item) => item.ok).length;
+  const approvalPolicy = createApprovalPolicyConfig(process.env);
   const demoCoreReady = telegram.some((item) => item.role === "manager" && item.ok) && ai.mode === "ai" && controlApi;
   const allAgentsReady = activeBots === 6;
   const publicationReady = meta.ok && metaConfig.publishEnabled;
@@ -85,8 +87,11 @@ async function main() {
       ok: ai.mode === "ai",
       structured_quality_score: ai.text.includes("ĐIỂM CHẤT LƯỢNG"),
       evidence_section: ai.text.includes("BẰNG CHỨNG"),
+      quality_score: ai.product.quality_score,
+      recommendation: ai.product.recommendation,
       fallback: ai.fallbackReason ?? null
     },
+    approval_policy: approvalPolicy,
     meta_page: { ...meta, publish_enabled: metaConfig.publishEnabled, auto_reply_enabled: process.env.META_AUTO_REPLY_ENABLED === "true" },
     control_api: { ok: controlApi, url: "http://127.0.0.1:8787" }
   };

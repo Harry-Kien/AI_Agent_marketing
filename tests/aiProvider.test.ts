@@ -108,6 +108,8 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     );
 
     expect(output.mode).toBe("ai");
+    expect(output.product.quality_score).toBe(84);
+    expect(output.product.recommendation).toBe("approve_with_conditions");
     expect(output.text).toContain("ĐIỂM CHẤT LƯỢNG: 84/100");
     expect(output.text).toContain("Insight khách hàng SME");
     expect(fetchMock).toHaveBeenCalledWith(
@@ -164,6 +166,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
     );
 
     expect(output.mode).toBe("mock");
+    expect(output.product.quality_score).toBe(68);
     expect(output.text).toContain("Brand & Performance Agent");
     expect(output.text).toContain("AI Agent cho SME");
   });
@@ -190,6 +193,7 @@ describe("9Router/OpenAI-compatible AI provider", () => {
 
     expect(output.mode).toBe("mock");
     expect(output.fallbackReason).toContain("AI provider unavailable");
+    expect(output.product.recommendation).toBe("approve_with_conditions");
     expect(output.text).toContain("Market Radar Bot");
   });
 

@@ -10,7 +10,10 @@ const agentRoster = [
   ["page-growth", "Page Growth & Community", "Page & CSKH"]
 ] as const;
 
-export function buildOfficeReadModel(snapshot: TelegramRuntimeSnapshot) {
+export function buildOfficeReadModel(
+  snapshot: TelegramRuntimeSnapshot,
+  env: Record<string, string | undefined> = process.env
+) {
   const campaign = snapshot.workflow.campaigns[snapshot.workflow.campaigns.length - 1];
   const activeRun = snapshot.workflow.runs.find((run) => run.id === campaign?.activeRunId);
   const pending = snapshot.workflow.runs.filter((run) => run.status === "pending_approval");
@@ -40,8 +43,12 @@ export function buildOfficeReadModel(snapshot: TelegramRuntimeSnapshot) {
     services: [
       { name: "Telegram", state: "online", detail: "6 vai trò Agent" },
       { name: "9Router", state: "online", detail: "AI gateway" },
-      { name: "Meta Page", state: process.env.META_PUBLISH_ENABLED === "true" ? "online" : "guarded", detail: process.env.META_PUBLISH_ENABLED === "true" ? "Được phép xuất bản" : "Đăng đang khóa" },
-      { name: "Human approval", state: "online", detail: "Bắt buộc" }
+      { name: "Meta Page", state: env.META_PUBLISH_ENABLED === "true" ? "online" : "guarded", detail: env.META_PUBLISH_ENABLED === "true" ? "Được phép xuất bản" : "Đăng đang khóa" },
+      {
+        name: "Human approval",
+        state: "online",
+        detail: env.MARKETING_APPROVAL_MODE === "strict-stage-gate" ? "Mỗi stage + xuất bản" : "Final + xuất bản"
+      }
     ]
   };
 }
