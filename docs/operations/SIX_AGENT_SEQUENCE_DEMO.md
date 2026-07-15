@@ -90,6 +90,8 @@ Xác nhận đăng CMP-<ID vừa tạo>
 
 Ở cấu hình production có kiểm soát, Page Growth phải hiển thị đúng `publication_content` trong Final Package. Chỉ sau câu xác nhận cuối của Operator, Meta Graph mới được gọi; kết quả thành công phải trả về `postId` làm bằng chứng. Nếu feature flag tắt hoặc credential không hợp lệ, hệ thống phải dừng và không thay đổi trạng thái thành `published`.
 
+Nếu Meta lỗi sau bước xác nhận, campaign chuyển sang `failed`, ghi `publication_failed` vào Audit và không tự retry để tránh đăng trùng. Operator phải đối soát Fanpage trước khi tạo lần xuất bản tiếp theo.
+
 ## 3. Tiêu chí đạt
 
 - Mỗi stage chỉ bắt đầu sau khi policy decision của stage trước đã lưu thành công.

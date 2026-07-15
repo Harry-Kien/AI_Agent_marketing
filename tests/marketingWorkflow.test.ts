@@ -8,6 +8,7 @@ import {
   requestPublicationConfirmation,
   confirmPublication,
   completePublication,
+  failPublication,
   listPendingRuns,
   rejectRun,
   reviseRun
@@ -212,5 +213,31 @@ describe("enterprise marketing workflow", () => {
     );
     expect(published.campaign.stage).toBe("published");
     expect(published.campaign.publicationEvidence?.postId).toBe("page_123");
+  });
+
+  it("stops safely and records an audit event when Meta publication fails", () => {
+    let state = createCampaign(createEmptyWorkflowState(), {
+      brief: "Campaign Meta failure",
+      createdBy: "owner",
+      now: clock,
+      idSuffix: "FAILPUB"
+    }).state;
+    for (const stage of ["research", "content", "creative", "brand", "final"] as const) {
+      const run = state.runs.find((item) => item.status === "running" && item.stage === stage)!;
+      state = completeRun(state, run.id, `${stage} package`, clock, {
+        publicationContent: stage === "final" ? "Bai Facebook da duoc duyet va san sang dang." : undefined
+      }).state;
+      state = approveRun(state, run.id, "owner", clock).state;
+    }
+    state = requestPublicationConfirmation(state, state.campaigns[0].id, "owner", clock).state;
+    state = confirmPublication(state, state.campaigns[0].id, "owner", clock).state;
+
+    const failed = failPublication(state, state.campaigns[0].id, "Meta Graph HTTP 500", clock);
+
+    expect(failed.campaign.stage).toBe("failed");
+    expect(failed.state.auditEvents[failed.state.auditEvents.length - 1]).toMatchObject({
+      action: "publication_failed",
+      actorId: "meta-graph"
+    });
   });
 });

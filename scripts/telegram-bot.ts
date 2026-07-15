@@ -13,6 +13,7 @@ import {
   confirmPublication,
   createCampaign,
   createEmptyWorkflowState,
+  failPublication,
   getCampaignTimeline,
   listPendingRuns,
   rejectRun,
@@ -510,12 +511,32 @@ async function handleWorkflowCommand(
       return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
     });
     const message = confirmed.publicationPreview?.replace(/^Bản xem trước xuất bản:\s*/, "") ?? confirmed.brief;
-    const evidence = await createMetaGraphClient(metaConfig).publish({ message, confirmationText: message, approvalId: `${confirmed.id}:${actorId}` });
-    await mutateRuntime(controller, (snapshot) => {
-      const result = completePublication(snapshot.workflow, confirmed.id, evidence);
-      return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
-    });
-    await sendMessage(manager.token, chatId, `Đã xuất bản có bằng chứng: ${evidence.postId}`);
+    try {
+      const evidence = await createMetaGraphClient(metaConfig).publish({
+        message,
+        confirmationText: message,
+        approvalId: `${confirmed.id}:${actorId}`
+      });
+      await mutateRuntime(controller, (snapshot) => {
+        const result = completePublication(snapshot.workflow, confirmed.id, evidence);
+        return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
+      });
+      await sendMessage(manager.token, chatId, [
+        `Đã xuất bản có bằng chứng: ${evidence.postId}`,
+        evidence.permalink ? `Link bài viết: ${evidence.permalink}` : ""
+      ].filter(Boolean).join("\n"));
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : "Meta Graph publication failed";
+      await mutateRuntime(controller, (snapshot) => {
+        const result = failPublication(snapshot.workflow, confirmed.id, reason);
+        return { snapshot: { ...snapshot, workflow: result.state }, value: result.campaign };
+      });
+      await sendMessage(manager.token, chatId, [
+        `Không thể xác nhận kết quả đăng cho ${confirmed.id}.`,
+        "Workflow đã dừng an toàn và không tự thử lại để tránh đăng trùng.",
+        "Hãy kiểm tra trực tiếp Fanpage và xem Audit trước khi xử lý tiếp."
+      ].join("\n"));
+    }
     return;
   }
 

@@ -74,6 +74,7 @@ export type MarketingAuditAction =
   | "publication_requested"
   | "publication_confirmed"
   | "publication_completed"
+  | "publication_failed"
   | "runtime_recovered";
 
 export interface TelegramAuditEvent {
@@ -539,6 +540,32 @@ export function completePublication(
     actorId: "meta-graph",
     action: "publication_completed",
     summary: `Publication completed with evidence ${evidence.postId}.`,
+    createdAt: timestamp
+  });
+  return { state, campaign };
+}
+
+export function failPublication(
+  current: MarketingWorkflowState,
+  campaignIdValue: string,
+  reason: string,
+  now: Clock = () => new Date().toISOString()
+) {
+  if (!reason.trim()) throw new Error("Publication failure reason is required.");
+  const state = cloneState(current);
+  const campaign = requireCampaign(state, campaignIdValue);
+  if (campaign.stage !== "publishing") {
+    throw new Error(`Campaign ${campaign.id} must be publishing.`);
+  }
+  const timestamp = now();
+  campaign.stage = "failed";
+  campaign.updatedAt = timestamp;
+  audit(state, {
+    campaignId: campaign.id,
+    actorType: "system",
+    actorId: "meta-graph",
+    action: "publication_failed",
+    summary: reason.trim().slice(0, 240),
     createdAt: timestamp
   });
   return { state, campaign };
