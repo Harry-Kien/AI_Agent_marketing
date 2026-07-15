@@ -1,9 +1,13 @@
 # TÀI LIỆU THIẾT KẾ VÀ TRÌNH BÀY HỆ THỐNG AI AGENT MARKETING COMMAND CENTER
 
-**Phiên bản:** 1.0 - 15/07/2026  
-**Đề tài:** Xây dựng hệ thống đa tác nhân AI hỗ trợ vận hành phòng Marketing doanh nghiệp qua Telegram  
-**Phạm vi hiện hành:** Telegram-first, Dashboard realtime, 9Router/LLM, Meta Graph API, Human-in-the-loop  
-**Repository:** `Harry-Kien/AI_Agent_marketing`  
+**Phiên bản:** 1.0 - 15/07/2026
+
+**Đề tài:** Xây dựng hệ thống đa tác nhân AI hỗ trợ vận hành phòng Marketing doanh nghiệp qua Telegram
+
+**Phạm vi hiện hành:** Telegram-first, Dashboard realtime, 9Router/LLM, Meta Graph API, Human-in-the-loop
+
+**Repository:** `Harry-Kien/AI_Agent_marketing`
+
 **Nhánh tích hợp:** `codex/six-agent-meta-office`
 
 ---
@@ -723,12 +727,12 @@ Quy trình GitHub: mỗi hạng mục có issue → branch `feature/*` hoặc `d
 
 ### 28.2. Lộ trình
 
-**Giai đoạn 1 - Bền vững hóa:** PostgreSQL, migration, transaction, queue, idempotency key và backup.  
-**Giai đoạn 2 - Triển khai cloud:** HTTPS webhook, secret manager, process supervisor, CI/CD và staging.  
-**Giai đoạn 3 - Quan sát:** OpenTelemetry, Sentry, dashboard latency/cost/token và alert.  
-**Giai đoạn 4 - Tri thức doanh nghiệp:** brand guideline, product catalog, FAQ, vector search và versioned knowledge base.  
-**Giai đoạn 5 - Tối ưu Marketing:** lịch nội dung, A/B testing, metrics ingestion, attribution và đề xuất cải tiến.  
-**Giai đoạn 6 - Workflow động:** cân nhắc Temporal/Trigger.dev cho durable execution; LangGraph khi thật sự cần graph agent động.
+- **Giai đoạn 1 - Bền vững hóa:** PostgreSQL, migration, transaction, queue, idempotency key và backup.
+- **Giai đoạn 2 - Triển khai cloud:** HTTPS webhook, secret manager, process supervisor, CI/CD và staging.
+- **Giai đoạn 3 - Quan sát:** OpenTelemetry, Sentry, dashboard latency/cost/token và alert.
+- **Giai đoạn 4 - Tri thức doanh nghiệp:** brand guideline, product catalog, FAQ, vector search và versioned knowledge base.
+- **Giai đoạn 5 - Tối ưu Marketing:** lịch nội dung, A/B testing, metrics ingestion, attribution và đề xuất cải tiến.
+- **Giai đoạn 6 - Workflow động:** cân nhắc Temporal/Trigger.dev cho durable execution; LangGraph khi thật sự cần graph agent động.
 
 ## 29. Câu hỏi phản biện và trả lời gợi ý
 
