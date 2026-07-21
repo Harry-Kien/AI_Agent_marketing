@@ -1,5 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
 import type { TelegramRuntimeSnapshot } from "./telegramStateStore";
+import type { CompetitorChangeEvent } from "../domain/competitorTypes";
+import { buildCompetitorReadModel, defaultCompetitorEvents } from "./competitorMonitor";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -53,9 +55,15 @@ export function buildOfficeReadModel(
   };
 }
 
-export function createControlApi(options: { getSnapshot: () => TelegramRuntimeSnapshot; host?: string; port?: number }) {
+export function createControlApi(options: {
+  getSnapshot: () => TelegramRuntimeSnapshot;
+  getCompetitorEvents?: () => CompetitorChangeEvent[];
+  host?: string;
+  port?: number;
+}) {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8787;
+  const getCompetitorEvents = options.getCompetitorEvents ?? (() => defaultCompetitorEvents());
   const eventClients = new Set<ServerResponse>();
   const server = createServer((request: IncomingMessage, response: ServerResponse) => {
     response.setHeader("access-control-allow-origin", "http://127.0.0.1:5174");
@@ -74,6 +82,7 @@ export function createControlApi(options: { getSnapshot: () => TelegramRuntimeSn
     response.setHeader("content-type", "application/json; charset=utf-8");
     if (request.method === "GET" && request.url === "/api/health") return send(response, 200, { ok: true, service: "marketing-control-api" });
     if (request.method === "GET" && request.url === "/api/runtime") return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+    if (request.method === "GET" && request.url === "/api/competitors") return send(response, 200, buildCompetitorReadModel(getCompetitorEvents()));
     return send(response, 404, { error: "not_found" });
   });
   const broadcast = (snapshot: TelegramRuntimeSnapshot) => {
