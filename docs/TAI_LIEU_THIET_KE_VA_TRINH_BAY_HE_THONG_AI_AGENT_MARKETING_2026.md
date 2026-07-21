@@ -860,8 +860,9 @@ Phiên bản hiện tại đủ để trình bày một chuỗi hoàn chỉnh: t
 
 ```powershell
 npm install
-npm run dev -- --port 5174
+npm run dev
 npm run control:api
+npm run demo:golden
 npm run telegram:bot
 npm run audit:system
 npm run test

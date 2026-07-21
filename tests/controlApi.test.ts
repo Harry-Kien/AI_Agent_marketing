@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { seedData } from "../src/data/seed";
-import { buildOfficeReadModel, createControlApi } from "../src/integrations/controlApi";
+import { buildOfficeReadModel, createControlApi, resolveAllowedOrigin } from "../src/integrations/controlApi";
 import { createCampaign, createEmptyWorkflowState } from "../src/integrations/marketingWorkflow";
 import { createTelegramSession } from "../src/integrations/telegramAdapter";
 import { createRuntimeSnapshot } from "../src/integrations/telegramStateStore";
@@ -17,6 +17,13 @@ describe("local control API read model", () => {
     expect(model.campaignTitle).toBe("AI cho SME");
     expect(model.services.find(({ name }) => name === "Human approval")?.detail).toBe("Final + xuất bản");
     expect(JSON.stringify(model)).not.toContain("TOKEN");
+  });
+
+  it("allows any loopback dev origin so the dashboard connects on 5173 or 5174", () => {
+    expect(resolveAllowedOrigin("http://127.0.0.1:5173")).toBe("http://127.0.0.1:5173");
+    expect(resolveAllowedOrigin("http://localhost:5174")).toBe("http://localhost:5174");
+    expect(resolveAllowedOrigin("https://evil.example")).toBe("http://127.0.0.1:5173");
+    expect(resolveAllowedOrigin("http://127.0.0.1:5173", "http://127.0.0.1:9000")).toBe("http://127.0.0.1:9000");
   });
 
   it("streams a realtime runtime event over SSE", async () => {

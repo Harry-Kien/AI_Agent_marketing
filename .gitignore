@@ -12,3 +12,6 @@ Tai_lieu_MVP_Lark_Repo_Agent_Command_Center.docx
 .env.*
 !.env.example
 npm-debug.log*
+
+# Playwright MCP scratch output
+.playwright-mcp/

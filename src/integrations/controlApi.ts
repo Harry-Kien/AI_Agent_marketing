@@ -77,13 +77,14 @@ export function createControlApi(options: {
   const getCompetitorEvents = options.getCompetitorEvents ?? (() => defaultCompetitorEvents());
   const eventClients = new Set<ServerResponse>();
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
-    response.setHeader("access-control-allow-origin", "http://127.0.0.1:5174");
+    const allowOrigin = resolveAllowedOrigin(request.headers.origin, env.CONTROL_API_ALLOW_ORIGIN);
+    response.setHeader("access-control-allow-origin", allowOrigin);
     if (request.method === "GET" && request.url === "/api/events") {
       response.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
         "cache-control": "no-cache, no-transform",
         connection: "keep-alive",
-        "access-control-allow-origin": "http://127.0.0.1:5174"
+        "access-control-allow-origin": allowOrigin
       });
       eventClients.add(response);
       writeEvent(response, buildOfficeReadModel(options.getSnapshot()));
@@ -139,6 +140,15 @@ export function createControlApi(options: {
     for (const client of eventClients) writeEvent(client, payload);
   };
   return { server, host, port, broadcast, listen: () => new Promise<void>((resolve) => server.listen(port, host, resolve)) };
+}
+
+// Control API chỉ chạy local; cho phép mọi origin loopback (127.0.0.1/localhost, cổng bất kỳ)
+// để dashboard chạy trên cổng dev nào cũng nối được. Có thể ghim cứng qua CONTROL_API_ALLOW_ORIGIN.
+const loopbackOrigin = /^http:\/\/(127\.0\.0\.1|localhost):\d+$/;
+export function resolveAllowedOrigin(requestOrigin: string | undefined, override?: string): string {
+  if (override) return override;
+  if (requestOrigin && loopbackOrigin.test(requestOrigin)) return requestOrigin;
+  return "http://127.0.0.1:5173";
 }
 
 function send(response: ServerResponse, status: number, payload: unknown) {
