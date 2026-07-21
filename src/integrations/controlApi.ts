@@ -10,6 +10,7 @@ import {
   sampleVideoRequest
 } from "./videoGenerationAdapter";
 import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "./campaignAnalytics";
+import { buildCommunityReadModel, sampleApprovedFaqs, sampleCommunityMessages } from "./communityInbox";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -120,6 +121,16 @@ export function createControlApi(options: {
     }
     if (request.method === "GET" && request.url === "/api/analytics") {
       return send(response, 200, buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget }));
+    }
+    if (request.method === "GET" && request.url === "/api/community") {
+      return send(
+        response,
+        200,
+        buildCommunityReadModel(sampleCommunityMessages, {
+          faqs: sampleApprovedFaqs,
+          autoReplyEnabled: env.META_AUTO_REPLY_ENABLED === "true"
+        })
+      );
     }
     return send(response, 404, { error: "not_found" });
   });
