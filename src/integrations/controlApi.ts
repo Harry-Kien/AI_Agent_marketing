@@ -3,6 +3,12 @@ import type { TelegramRuntimeSnapshot } from "./telegramStateStore";
 import type { CompetitorChangeEvent } from "../domain/competitorTypes";
 import { buildCompetitorReadModel, defaultCompetitorEvents } from "./competitorMonitor";
 import { buildMarketResearchReadModel, sampleMarketSignals } from "./marketResearch";
+import {
+  buildVideoStudioReadModel,
+  createVideoProviderConfig,
+  generateVideoJob,
+  sampleVideoRequest
+} from "./videoGenerationAdapter";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -59,14 +65,16 @@ export function buildOfficeReadModel(
 export function createControlApi(options: {
   getSnapshot: () => TelegramRuntimeSnapshot;
   getCompetitorEvents?: () => CompetitorChangeEvent[];
+  env?: Record<string, string | undefined>;
   host?: string;
   port?: number;
 }) {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8787;
+  const env = options.env ?? process.env;
   const getCompetitorEvents = options.getCompetitorEvents ?? (() => defaultCompetitorEvents());
   const eventClients = new Set<ServerResponse>();
-  const server = createServer((request: IncomingMessage, response: ServerResponse) => {
+  const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     response.setHeader("access-control-allow-origin", "http://127.0.0.1:5174");
     if (request.method === "GET" && request.url === "/api/events") {
       response.writeHead(200, {
@@ -97,6 +105,17 @@ export function createControlApi(options: {
           competitorEvents: getCompetitorEvents()
         })
       );
+    }
+    if (request.method === "GET" && request.url === "/api/video-studio") {
+      const snapshot = options.getSnapshot();
+      const campaign = snapshot.workflow.campaigns[snapshot.workflow.campaigns.length - 1];
+      const videoRequest = {
+        ...sampleVideoRequest,
+        campaignId: campaign?.id ?? sampleVideoRequest.campaignId,
+        title: campaign?.brief ? `Video 30s: ${campaign.brief}` : sampleVideoRequest.title
+      };
+      const job = await generateVideoJob(createVideoProviderConfig(env), videoRequest);
+      return send(response, 200, buildVideoStudioReadModel(job));
     }
     return send(response, 404, { error: "not_found" });
   });
