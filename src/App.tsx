@@ -49,10 +49,38 @@ function App() {
   const [activeView, setActiveView] = useState<View>("office");
   const [snapshot, setSnapshot] = useState<OfficeSnapshot>(officeFallback);
   const [analytics, setAnalytics] = useState<AnalyticsView | null>(null);
+  const [briefInput, setBriefInput] = useState("");
+  const [busy, setBusy] = useState(false);
 
   const refresh = () => {
     loadOfficeSnapshot().then(setSnapshot);
     loadAnalytics().then(setAnalytics);
+  };
+
+  const postAction = async (path: string, body?: unknown) => {
+    setBusy(true);
+    try {
+      const response = await fetch(`http://127.0.0.1:8787${path}`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: body ? JSON.stringify(body) : undefined
+      });
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      refresh();
+      return true;
+    } catch (error) {
+      console.warn("Control API action failed:", error);
+      return false;
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  const handleCreateCampaign = async () => {
+    const brief = briefInput.trim();
+    if (!brief) return;
+    const ok = await postAction("/api/campaigns", { brief });
+    if (ok) setBriefInput("");
   };
 
   useEffect(() => {
@@ -176,9 +204,29 @@ function App() {
           </p>
         </div>
         <div className="brief-card">
-          <span>Yêu cầu cần duyệt</span>
-          <strong>{snapshot.approvals} gói công việc</strong>
-          <p>{snapshot.approvals ? "Vui lòng mở Telegram hoặc Bàn phê duyệt để xử lý." : "Hiện không có gói nào chờ duyệt."}</p>
+          <span>Khởi chạy chiến dịch mới</span>
+          <textarea
+            value={briefInput}
+            onChange={(event) => setBriefInput(event.target.value)}
+            placeholder="Ví dụ: Chiến dịch Facebook 7 ngày giới thiệu AI Agent cho SME, mục tiêu thu lead tư vấn..."
+            rows={3}
+            style={{ width: "100%", padding: "0.5rem", borderRadius: "6px", border: "1px solid var(--line)", fontFamily: "inherit", fontSize: "0.8rem", margin: "0.4rem 0" }}
+          />
+          <div style={{ display: "flex", gap: "0.4rem", flexWrap: "wrap" }}>
+            <button onClick={handleCreateCampaign} disabled={busy || !briefInput.trim()} style={{ background: "var(--blue)", color: "#fff", borderColor: "var(--blue)", fontSize: "0.8rem", padding: "0.4rem 0.7rem" }}>
+              {busy ? "Đang xử lý..." : "Khởi chạy chiến dịch"}
+            </button>
+            {snapshot.stage === "publication_pending_confirmation" && (
+              <button onClick={() => postAction("/api/publication/confirm")} disabled={busy} style={{ background: "var(--green)", color: "#fff", borderColor: "var(--green)", fontSize: "0.8rem", padding: "0.4rem 0.7rem" }}>
+                Xác nhận đăng
+              </button>
+            )}
+          </div>
+          <p style={{ marginTop: "0.5rem" }}>
+            {snapshot.connected
+              ? `${snapshot.approvals} gói chờ duyệt · giai đoạn: ${statusLabel(snapshot.stage)}`
+              : "Chưa nối Control API — chạy `npm run control:api` để điều khiển thật."}
+          </p>
         </div>
       </div>
 

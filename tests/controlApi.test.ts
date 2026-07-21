@@ -26,6 +26,52 @@ describe("local control API read model", () => {
     expect(resolveAllowedOrigin("http://127.0.0.1:5173", "http://127.0.0.1:9000")).toBe("http://127.0.0.1:9000");
   });
 
+  it("routes write actions and answers CORS preflight", async () => {
+    const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
+    const calls: string[] = [];
+    const api = createControlApi({
+      getSnapshot: () => snapshot,
+      actions: {
+        createCampaign: (brief) => { calls.push(`create:${brief}`); },
+        approveActive: () => { calls.push("approve"); },
+        rejectActive: (feedback) => { calls.push(`reject:${feedback}`); }
+      },
+      port: 0
+    });
+    await api.listen();
+    const address = api.server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+    const base = `http://127.0.0.1:${address.port}`;
+    try {
+      const preflight = await fetch(`${base}/api/campaigns`, { method: "OPTIONS" });
+      expect(preflight.status).toBe(204);
+      expect(preflight.headers.get("access-control-allow-methods")).toContain("POST");
+
+      const created = await fetch(`${base}/api/campaigns`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ brief: "AI cho SME" })
+      });
+      expect(created.status).toBe(200);
+      await fetch(`${base}/api/approvals/active/approve`, { method: "POST" });
+      await fetch(`${base}/api/approvals/active/reject`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ feedback: "Sửa CTA" })
+      });
+      expect(calls).toEqual(["create:AI cho SME", "approve", "reject:Sửa CTA"]);
+
+      const rejectedEmpty = await fetch(`${base}/api/campaigns`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({})
+      });
+      expect(rejectedEmpty.status).toBe(400);
+    } finally {
+      api.server.close();
+    }
+  });
+
   it("streams a realtime runtime event over SSE", async () => {
     const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
     const api = createControlApi({ getSnapshot: () => snapshot, port: 0 });

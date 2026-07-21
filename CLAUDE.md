@@ -92,7 +92,10 @@ controlApi (read model REDACTED + SSE)  →  dashboard của Bảo (fetch/SSE)
 | `aiProvider.ts` / `agentWorkProduct.ts` | Gọi AI (9Router, OpenAI-compatible) + schema output |
 | `metaGraphAdapter.ts` | Đăng Facebook (guarded) |
 | `competitorMonitor.ts` · `marketResearch.ts` · `videoGenerationAdapter.ts` · `campaignAnalytics.ts` · `communityInbox.ts` | 5 module năng lực F02/F03/F06/F10/F11 |
-| `controlApi.ts` | HTTP + SSE read model cho dashboard |
+| `campaignOrchestrator.ts` | Điều phối vòng đời chiến dịch (start/approve/reject/publish) không cần Telegram — dùng chung policy engine với bot |
+| `controlApi.ts` | HTTP + SSE read model (GET) + write-path (POST: `/api/campaigns`, `/api/approvals/active/approve`, `/api/approvals/active/reject`, `/api/publication/confirm`) |
+
+Write-path: dashboard (App.tsx) → POST Control API → `campaignOrchestrator` → `marketingWorkflow` + `aiProvider` + policy → persist + SSE broadcast. Nút bấm cần `npm run control:api` chạy.
 
 Domain types tương ứng ở `src/domain/*Types.ts`.
 

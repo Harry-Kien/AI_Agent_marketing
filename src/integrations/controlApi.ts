@@ -64,9 +64,19 @@ export function buildOfficeReadModel(
   };
 }
 
+// Hành động ghi (write-path) do tầng runtime (script/telegram-bot) hiện thực; API chỉ điều phối.
+export interface ControlApiActions {
+  createCampaign?: (brief: string) => Promise<void> | void;
+  approveActive?: () => Promise<void> | void;
+  rejectActive?: (feedback: string) => Promise<void> | void;
+  requestPublication?: () => Promise<void> | void;
+  confirmPublication?: () => Promise<void> | void;
+}
+
 export function createControlApi(options: {
   getSnapshot: () => TelegramRuntimeSnapshot;
   getCompetitorEvents?: () => CompetitorChangeEvent[];
+  actions?: ControlApiActions;
   env?: Record<string, string | undefined>;
   host?: string;
   port?: number;
@@ -79,6 +89,13 @@ export function createControlApi(options: {
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
     const allowOrigin = resolveAllowedOrigin(request.headers.origin, env.CONTROL_API_ALLOW_ORIGIN);
     response.setHeader("access-control-allow-origin", allowOrigin);
+    response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
+    response.setHeader("access-control-allow-headers", "content-type");
+    if (request.method === "OPTIONS") {
+      response.writeHead(204);
+      response.end();
+      return;
+    }
     if (request.method === "GET" && request.url === "/api/events") {
       response.writeHead(200, {
         "content-type": "text/event-stream; charset=utf-8",
@@ -133,6 +150,38 @@ export function createControlApi(options: {
         })
       );
     }
+    if (request.method === "POST" && request.url?.startsWith("/api/")) {
+      const actions = options.actions;
+      if (!actions) return send(response, 501, { error: "actions_not_supported" });
+      try {
+        if (request.url === "/api/campaigns") {
+          const body = await readJsonBody(request);
+          const brief = typeof body.brief === "string" ? body.brief.trim() : "";
+          if (!brief) return send(response, 400, { error: "brief_required" });
+          await actions.createCampaign?.(brief);
+          return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+        if (request.url === "/api/approvals/active/approve") {
+          await actions.approveActive?.();
+          return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+        if (request.url === "/api/approvals/active/reject" || request.url === "/api/runs/active/revise") {
+          const body = await readJsonBody(request);
+          await actions.rejectActive?.(typeof body.feedback === "string" ? body.feedback : "");
+          return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+        if (request.url === "/api/publication/request") {
+          await actions.requestPublication?.();
+          return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+        if (request.url === "/api/publication/confirm") {
+          await actions.confirmPublication?.();
+          return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+      } catch (error) {
+        return send(response, 409, { error: error instanceof Error ? error.message : "action_failed" });
+      }
+    }
     return send(response, 404, { error: "not_found" });
   });
   const broadcast = (snapshot: TelegramRuntimeSnapshot) => {
@@ -149,6 +198,24 @@ export function resolveAllowedOrigin(requestOrigin: string | undefined, override
   if (override) return override;
   if (requestOrigin && loopbackOrigin.test(requestOrigin)) return requestOrigin;
   return "http://127.0.0.1:5173";
+}
+
+function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {
+  return new Promise((resolve) => {
+    let data = "";
+    request.on("data", (chunk) => {
+      data += chunk;
+      if (data.length > 100_000) data = data.slice(0, 100_000);
+    });
+    request.on("end", () => {
+      try {
+        resolve(data ? (JSON.parse(data) as Record<string, unknown>) : {});
+      } catch {
+        resolve({});
+      }
+    });
+    request.on("error", () => resolve({}));
+  });
 }
 
 function send(response: ServerResponse, status: number, payload: unknown) {
