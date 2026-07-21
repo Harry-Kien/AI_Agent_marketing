@@ -2,6 +2,7 @@ import { createServer, type IncomingMessage, type ServerResponse } from "node:ht
 import type { TelegramRuntimeSnapshot } from "./telegramStateStore";
 import type { CompetitorChangeEvent } from "../domain/competitorTypes";
 import { buildCompetitorReadModel, defaultCompetitorEvents } from "./competitorMonitor";
+import { buildMarketResearchReadModel, sampleMarketSignals } from "./marketResearch";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -83,6 +84,20 @@ export function createControlApi(options: {
     if (request.method === "GET" && request.url === "/api/health") return send(response, 200, { ok: true, service: "marketing-control-api" });
     if (request.method === "GET" && request.url === "/api/runtime") return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
     if (request.method === "GET" && request.url === "/api/competitors") return send(response, 200, buildCompetitorReadModel(getCompetitorEvents()));
+    if (request.method === "GET" && request.url === "/api/market-research") {
+      const snapshot = options.getSnapshot();
+      const campaign = snapshot.workflow.campaigns[snapshot.workflow.campaigns.length - 1];
+      return send(
+        response,
+        200,
+        buildMarketResearchReadModel({
+          campaignId: campaign?.id ?? "CMP-DEMO",
+          brief: campaign?.brief ?? "Chưa có brief chiến dịch.",
+          signals: sampleMarketSignals,
+          competitorEvents: getCompetitorEvents()
+        })
+      );
+    }
     return send(response, 404, { error: "not_found" });
   });
   const broadcast = (snapshot: TelegramRuntimeSnapshot) => {
