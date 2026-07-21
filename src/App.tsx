@@ -22,7 +22,7 @@ import { OperationsPanel } from "./features/agent-office/OperationsPanel";
 import { CampaignBoard } from "./features/agent-office/CampaignBoard";
 import { CompetitorList } from "./features/agent-office/CompetitorList";
 import { ContentStudio } from "./features/agent-office/ContentStudio";
-import { loadAnalytics, loadOfficeSnapshot, officeFallback } from "./features/agent-office/api";
+import { API_BASE, loadAnalytics, loadOfficeSnapshot, officeFallback } from "./features/agent-office/api";
 import type { AnalyticsView, OfficeSnapshot } from "./features/agent-office/types";
 
 type View = "office" | "dashboard" | "campaigns" | "competitors" | "studio" | "community" | "operations";
@@ -60,7 +60,7 @@ function App() {
   };
 
   useEffect(() => {
-    fetch("http://127.0.0.1:8787/api/health")
+    fetch(`${API_BASE}/api/health`)
       .then((response) => response.json())
       .then((health: { authRequired?: boolean }) => setAuthRequired(Boolean(health.authRequired)))
       .catch(() => setAuthRequired(false));
@@ -77,7 +77,7 @@ function App() {
     try {
       const headers: Record<string, string> = { "content-type": "application/json" };
       if (token) headers.authorization = `Bearer ${token}`;
-      const response = await fetch(`http://127.0.0.1:8787${path}`, {
+      const response = await fetch(`${API_BASE}${path}`, {
         method: "POST",
         headers,
         body: body ? JSON.stringify(body) : undefined
@@ -106,7 +106,7 @@ function App() {
 
   useEffect(() => {
     refresh();
-    const stream = new EventSource("http://127.0.0.1:8787/api/events");
+    const stream = new EventSource(`${API_BASE}/api/events`);
     const receive = (event: MessageEvent<string>) => {
       try {
         setSnapshot({ ...(JSON.parse(event.data) as OfficeSnapshot), connected: true });

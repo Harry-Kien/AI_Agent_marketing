@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
-import { resolve } from "node:path";
+import { mkdir, readdir, rm, writeFile } from "node:fs/promises";
+import { dirname, join, resolve } from "node:path";
 import { seedData } from "../src/data/seed";
 import { createControlApi } from "../src/integrations/controlApi";
 import { createEmptyWorkflowState } from "../src/integrations/marketingWorkflow";
@@ -54,19 +55,37 @@ function enqueue<T>(task: () => Promise<T>): Promise<T> {
   return run;
 }
 
+// Giữ tối đa 10 bản backup có timestamp để phục hồi khi state chính hỏng (durability).
+const backupDir = resolve(dirname(statePath), "backups");
+async function rotateBackup() {
+  try {
+    await mkdir(backupDir, { recursive: true });
+    await writeFile(join(backupDir, `state-${Date.now()}.json`), `${JSON.stringify(snapshot, null, 2)}\n`, "utf8");
+    const files = (await readdir(backupDir)).filter((name) => name.startsWith("state-")).sort();
+    for (const stale of files.slice(0, Math.max(0, files.length - 10))) {
+      await rm(join(backupDir, stale), { force: true });
+    }
+  } catch (error) {
+    log.warn("Không tạo được backup state", { reason: error instanceof Error ? error.message : "unknown" });
+  }
+}
+
 async function commit(nextWorkflow: typeof snapshot.workflow) {
   snapshot = { ...snapshot, workflow: nextWorkflow };
   await saveRuntimeSnapshot(statePath, snapshot);
   fingerprint = JSON.stringify(snapshot.workflow);
+  await rotateBackup();
   api.broadcast(snapshot);
 }
 
+const distDir = resolve(process.cwd(), "dist");
 const api = createControlApi({
   getSnapshot: () => snapshot,
   env: process.env,
   token: config.controlApi.token,
   host: config.controlApi.host,
   port: config.controlApi.port,
+  staticDir: distDir,
   actions: {
     createCampaign: (brief) =>
       enqueue(async () => commit(await startCampaign(snapshot.workflow, orchestratorContext(), { brief, createdBy: "dashboard-operator" }))),

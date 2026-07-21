@@ -1,7 +1,10 @@
 // @vitest-environment node
 import { describe, expect, it } from "vitest";
 import { seedData } from "../src/data/seed";
-import { buildOfficeReadModel, createControlApi, resolveAllowedOrigin } from "../src/integrations/controlApi";
+import { mkdtempSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { buildOfficeReadModel, createControlApi, createRateLimiter, resolveAllowedOrigin } from "../src/integrations/controlApi";
 import { createCampaign, createEmptyWorkflowState } from "../src/integrations/marketingWorkflow";
 import { createTelegramSession } from "../src/integrations/telegramAdapter";
 import { createRuntimeSnapshot } from "../src/integrations/telegramStateStore";
@@ -99,6 +102,56 @@ describe("local control API read model", () => {
       });
       expect(withAuth.status).toBe(200);
       expect(approved).toBe(1);
+    } finally {
+      api.server.close();
+    }
+  });
+
+  it("createRateLimiter cho qua tới ngưỡng rồi chặn", () => {
+    const limiter = createRateLimiter(2, 10_000);
+    expect(limiter("ip")).toBe(true);
+    expect(limiter("ip")).toBe(true);
+    expect(limiter("ip")).toBe(false);
+    expect(limiter("other-ip")).toBe(true);
+  });
+
+  it("trả 429 khi vượt rate limit write-path", async () => {
+    const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
+    const api = createControlApi({
+      getSnapshot: () => snapshot,
+      actions: { approveActive: () => {} },
+      writeRateLimit: { max: 1, windowMs: 10_000 },
+      port: 0
+    });
+    await api.listen();
+    const address = api.server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+    const base = `http://127.0.0.1:${address.port}`;
+    try {
+      expect((await fetch(`${base}/api/approvals/active/approve`, { method: "POST" })).status).toBe(200);
+      expect((await fetch(`${base}/api/approvals/active/approve`, { method: "POST" })).status).toBe(429);
+    } finally {
+      api.server.close();
+    }
+  });
+
+  it("phục vụ dashboard tĩnh với SPA fallback", async () => {
+    const dir = mkdtempSync(join(tmpdir(), "static-"));
+    writeFileSync(join(dir, "index.html"), "<!doctype html><title>Dashboard</title>");
+    const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
+    const api = createControlApi({ getSnapshot: () => snapshot, staticDir: dir, port: 0 });
+    await api.listen();
+    const address = api.server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+    const base = `http://127.0.0.1:${address.port}`;
+    try {
+      const root = await fetch(`${base}/`);
+      expect(root.headers.get("content-type")).toContain("text/html");
+      expect(await root.text()).toContain("Dashboard");
+      const spa = await fetch(`${base}/some/client/route`);
+      expect(await spa.text()).toContain("Dashboard");
+      // /api vẫn là JSON, không bị nuốt bởi static
+      expect((await fetch(`${base}/api/health`)).headers.get("content-type")).toContain("application/json");
     } finally {
       api.server.close();
     }

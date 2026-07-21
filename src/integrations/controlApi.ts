@@ -1,4 +1,7 @@
 import { createServer, type IncomingMessage, type ServerResponse } from "node:http";
+import { readFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
+import { extname, join, normalize } from "node:path";
 import type { TelegramRuntimeSnapshot } from "./telegramStateStore";
 import type { CompetitorChangeEvent } from "../domain/competitorTypes";
 import { buildCompetitorReadModel, defaultCompetitorEvents } from "./competitorMonitor";
@@ -78,6 +81,8 @@ export function createControlApi(options: {
   getCompetitorEvents?: () => CompetitorChangeEvent[];
   actions?: ControlApiActions;
   token?: string;
+  staticDir?: string;
+  writeRateLimit?: { max: number; windowMs: number };
   env?: Record<string, string | undefined>;
   host?: string;
   port?: number;
@@ -86,6 +91,9 @@ export function createControlApi(options: {
   const port = options.port ?? 8787;
   const env = options.env ?? process.env;
   const token = options.token;
+  const staticDir = options.staticDir && existsSync(options.staticDir) ? options.staticDir : undefined;
+  const rateLimit = options.writeRateLimit ?? { max: 60, windowMs: 10_000 };
+  const limiter = createRateLimiter(rateLimit.max, rateLimit.windowMs);
   const isAuthorized = (request: IncomingMessage): boolean =>
     !token || request.headers.authorization === `Bearer ${token}`;
   const getCompetitorEvents = options.getCompetitorEvents ?? (() => defaultCompetitorEvents());
@@ -94,7 +102,10 @@ export function createControlApi(options: {
     const allowOrigin = resolveAllowedOrigin(request.headers.origin, env.CONTROL_API_ALLOW_ORIGIN);
     response.setHeader("access-control-allow-origin", allowOrigin);
     response.setHeader("access-control-allow-methods", "GET, POST, OPTIONS");
-    response.setHeader("access-control-allow-headers", "content-type");
+    response.setHeader("access-control-allow-headers", "content-type, authorization");
+    response.setHeader("x-content-type-options", "nosniff");
+    response.setHeader("x-frame-options", "SAMEORIGIN");
+    response.setHeader("referrer-policy", "no-referrer");
     if (request.method === "OPTIONS") {
       response.writeHead(204);
       response.end();
@@ -158,6 +169,8 @@ export function createControlApi(options: {
       const actions = options.actions;
       if (!actions) return send(response, 501, { error: "actions_not_supported" });
       if (!isAuthorized(request)) return send(response, 401, { error: "unauthorized" });
+      const clientKey = request.socket.remoteAddress ?? "unknown";
+      if (!limiter(clientKey)) return send(response, 429, { error: "rate_limited" });
       try {
         if (request.url === "/api/campaigns") {
           const body = await readJsonBody(request);
@@ -187,6 +200,9 @@ export function createControlApi(options: {
         return send(response, 409, { error: error instanceof Error ? error.message : "action_failed" });
       }
     }
+    if (request.method === "GET" && staticDir && !request.url?.startsWith("/api/")) {
+      return serveStatic(response, staticDir, request.url ?? "/");
+    }
     return send(response, 404, { error: "not_found" });
   });
   const broadcast = (snapshot: TelegramRuntimeSnapshot) => {
@@ -203,6 +219,50 @@ export function resolveAllowedOrigin(requestOrigin: string | undefined, override
   if (override) return override;
   if (requestOrigin && loopbackOrigin.test(requestOrigin)) return requestOrigin;
   return "http://127.0.0.1:5173";
+}
+
+// Rate limiter cửa sổ trượt trong bộ nhớ, theo IP. Trả false khi vượt ngưỡng.
+export function createRateLimiter(max: number, windowMs: number): (key: string) => boolean {
+  const hits = new Map<string, number[]>();
+  return (key: string) => {
+    const now = Date.now();
+    const recent = (hits.get(key) ?? []).filter((time) => now - time < windowMs);
+    if (recent.length >= max) {
+      hits.set(key, recent);
+      return false;
+    }
+    recent.push(now);
+    hits.set(key, recent);
+    return true;
+  };
+}
+
+const contentTypes: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json; charset=utf-8",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".jpg": "image/jpeg",
+  ".ico": "image/x-icon",
+  ".woff2": "font/woff2"
+};
+
+// Phục vụ file tĩnh của dashboard đã build; fallback về index.html cho SPA routing.
+async function serveStatic(response: ServerResponse, root: string, url: string) {
+  const cleanPath = normalize(decodeURIComponent(url.split("?")[0])).replace(/^(\.\.[/\\])+/, "");
+  let filePath = join(root, cleanPath);
+  if (!filePath.startsWith(root)) filePath = join(root, "index.html");
+  if (!existsSync(filePath) || extname(filePath) === "") filePath = join(root, "index.html");
+  try {
+    const file = await readFile(filePath);
+    response.setHeader("content-type", contentTypes[extname(filePath)] ?? "application/octet-stream");
+    response.statusCode = 200;
+    response.end(file);
+  } catch {
+    send(response, 404, { error: "not_found" });
+  }
 }
 
 function readJsonBody(request: IncomingMessage): Promise<Record<string, unknown>> {

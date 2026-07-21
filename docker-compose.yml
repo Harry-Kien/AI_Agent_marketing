@@ -1,0 +1,24 @@
+services:
+  command-center:
+    build:
+      context: .
+      args:
+        VITE_CONTROL_API_BASE: ""
+    image: ai-marketing-command-center
+    ports:
+      - "8787:8787"
+    environment:
+      NODE_ENV: production
+      CONTROL_API_HOST: 0.0.0.0
+      CONTROL_API_PORT: "8787"
+      LOG_LEVEL: info
+      # BẮT BUỘC cho production: token bảo vệ write-path (>=16 ký tự).
+      CONTROL_API_TOKEN: "${CONTROL_API_TOKEN:?Đặt CONTROL_API_TOKEN trong .env trước khi chạy}"
+      # Tùy chọn — cắm khi có (để trống thì hệ thống chạy chế độ mock an toàn).
+      NINE_ROUTER_API_KEY: "${NINE_ROUTER_API_KEY:-}"
+      NINE_ROUTER_MODEL: "${NINE_ROUTER_MODEL:-}"
+      MARKETING_APPROVAL_MODE: "${MARKETING_APPROVAL_MODE:-enterprise-risk-based}"
+      META_PUBLISH_ENABLED: "${META_PUBLISH_ENABLED:-false}"
+    volumes:
+      - ./output:/app/output
+    restart: unless-stopped

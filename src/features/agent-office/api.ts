@@ -7,7 +7,9 @@ import type {
   VideoStudioView
 } from "./types";
 
-const API_BASE = "http://127.0.0.1:8787";
+// Base URL của Control API. Khi build production same-origin, đặt VITE_CONTROL_API_BASE=""
+// để dùng đường dẫn tương đối (/api/...). Mặc định trỏ cổng dev 8787.
+export const API_BASE = (import.meta.env.VITE_CONTROL_API_BASE as string | undefined) ?? "http://127.0.0.1:8787";
 
 // Fetch một endpoint read-only; nếu offline hoặc lỗi thì trả về `null` để component dùng dữ liệu mẫu.
 async function fetchJson<T>(path: string): Promise<T | null> {
@@ -69,7 +71,7 @@ export const officeFallback: OfficeSnapshot = {
 
 export async function loadOfficeSnapshot(): Promise<OfficeSnapshot> {
   try {
-    const response = await fetch("http://127.0.0.1:8787/api/runtime", { signal: AbortSignal.timeout(1800) });
+    const response = await fetch(`${API_BASE}/api/runtime`, { signal: AbortSignal.timeout(1800) });
     if (!response.ok) throw new Error("offline");
     return { ...(await response.json() as OfficeSnapshot), connected: true };
   } catch {
