@@ -51,20 +51,41 @@ function App() {
   const [analytics, setAnalytics] = useState<AnalyticsView | null>(null);
   const [briefInput, setBriefInput] = useState("");
   const [busy, setBusy] = useState(false);
+  const [authRequired, setAuthRequired] = useState(false);
+  const [token, setToken] = useState<string>(() => localStorage.getItem("controlApiToken") ?? "");
 
   const refresh = () => {
     loadOfficeSnapshot().then(setSnapshot);
     loadAnalytics().then(setAnalytics);
   };
 
+  useEffect(() => {
+    fetch("http://127.0.0.1:8787/api/health")
+      .then((response) => response.json())
+      .then((health: { authRequired?: boolean }) => setAuthRequired(Boolean(health.authRequired)))
+      .catch(() => setAuthRequired(false));
+  }, []);
+
+  const saveToken = (value: string) => {
+    setToken(value);
+    if (value) localStorage.setItem("controlApiToken", value);
+    else localStorage.removeItem("controlApiToken");
+  };
+
   const postAction = async (path: string, body?: unknown) => {
     setBusy(true);
     try {
+      const headers: Record<string, string> = { "content-type": "application/json" };
+      if (token) headers.authorization = `Bearer ${token}`;
       const response = await fetch(`http://127.0.0.1:8787${path}`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers,
         body: body ? JSON.stringify(body) : undefined
       });
+      if (response.status === 401) {
+        alert("Token điều khiển không hợp lệ hoặc thiếu. Vui lòng nhập đúng CONTROL_API_TOKEN.");
+        return false;
+      }
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       refresh();
       return true;
@@ -205,6 +226,20 @@ function App() {
         </div>
         <div className="brief-card">
           <span>Khởi chạy chiến dịch mới</span>
+          {authRequired && (
+            <div style={{ margin: "0.4rem 0" }}>
+              <input
+                type="password"
+                value={token}
+                onChange={(event) => saveToken(event.target.value)}
+                placeholder="Nhập token điều khiển (CONTROL_API_TOKEN)"
+                style={{ width: "100%", padding: "0.45rem", borderRadius: "6px", border: `1px solid ${token ? "var(--green)" : "var(--amber)"}`, fontSize: "0.78rem" }}
+              />
+              <small style={{ color: token ? "var(--green)" : "var(--amber)", fontSize: "0.68rem" }}>
+                {token ? "● Đã có token — hành động ghi được ký xác thực" : "○ Cần token để tạo/duyệt chiến dịch"}
+              </small>
+            </div>
+          )}
           <textarea
             value={briefInput}
             onChange={(event) => setBriefInput(event.target.value)}

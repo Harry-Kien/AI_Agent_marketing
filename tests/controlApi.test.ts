@@ -72,6 +72,38 @@ describe("local control API read model", () => {
     }
   });
 
+  it("bảo vệ write-path bằng bearer token khi có token", async () => {
+    const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
+    let approved = 0;
+    const api = createControlApi({
+      getSnapshot: () => snapshot,
+      token: "a-very-strong-token-123",
+      actions: { approveActive: () => { approved += 1; } },
+      port: 0
+    });
+    await api.listen();
+    const address = api.server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+    const base = `http://127.0.0.1:${address.port}`;
+    try {
+      const health = await (await fetch(`${base}/api/health`)).json();
+      expect(health.authRequired).toBe(true);
+
+      const noAuth = await fetch(`${base}/api/approvals/active/approve`, { method: "POST" });
+      expect(noAuth.status).toBe(401);
+      expect(approved).toBe(0);
+
+      const withAuth = await fetch(`${base}/api/approvals/active/approve`, {
+        method: "POST",
+        headers: { authorization: "Bearer a-very-strong-token-123" }
+      });
+      expect(withAuth.status).toBe(200);
+      expect(approved).toBe(1);
+    } finally {
+      api.server.close();
+    }
+  });
+
   it("streams a realtime runtime event over SSE", async () => {
     const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
     const api = createControlApi({ getSnapshot: () => snapshot, port: 0 });

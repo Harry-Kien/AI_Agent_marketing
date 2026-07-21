@@ -16,6 +16,8 @@ import {
   type OrchestratorContext
 } from "../src/integrations/campaignOrchestrator";
 import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
+import { loadAppConfig } from "../src/config/appConfig";
+import { createLogger } from "../src/lib/logger";
 
 const envPath = resolve(process.cwd(), ".env");
 if (existsSync(envPath)) for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
@@ -23,7 +25,11 @@ if (existsSync(envPath)) for (const line of readFileSync(envPath, "utf8").split(
   const [key, ...parts] = value.split("="); if (!process.env[key]) process.env[key] = parts.join("=").replace(/^["']|["']$/g, "");
 }
 
-const statePath = resolve(process.cwd(), process.env.TELEGRAM_RUNTIME_STATE_PATH ?? "output/telegram-runtime-state.json");
+const config = loadAppConfig(process.env);
+const log = createLogger({ level: config.logLevel, service: "control-api" });
+for (const warning of config.warnings) log.warn(warning);
+
+const statePath = resolve(process.cwd(), config.statePath);
 let snapshot = (await loadRuntimeSnapshot(statePath, () => createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() }))).snapshot;
 let fingerprint = JSON.stringify(snapshot.workflow);
 
@@ -58,6 +64,9 @@ async function commit(nextWorkflow: typeof snapshot.workflow) {
 const api = createControlApi({
   getSnapshot: () => snapshot,
   env: process.env,
+  token: config.controlApi.token,
+  host: config.controlApi.host,
+  port: config.controlApi.port,
   actions: {
     createCampaign: (brief) =>
       enqueue(async () => commit(await startCampaign(snapshot.workflow, orchestratorContext(), { brief, createdBy: "dashboard-operator" }))),
@@ -73,8 +82,18 @@ const api = createControlApi({
 });
 
 await api.listen();
-console.log(`Marketing Control API: http://${api.host}:${api.port}`);
-console.log("Write-path bật: dashboard có thể tạo chiến dịch, duyệt, từ chối và xác nhận xuất bản.");
+log.info(`Marketing Control API sẵn sàng: http://${api.host}:${api.port}`, {
+  authRequired: Boolean(config.controlApi.token),
+  nodeEnv: config.nodeEnv
+});
+log.info("Write-path bật: dashboard có thể tạo chiến dịch, duyệt, từ chối và xác nhận xuất bản.");
+
+for (const signal of ["SIGINT", "SIGTERM"] as const) {
+  process.on(signal, () => {
+    log.info(`Nhận ${signal}, đóng Control API an toàn.`);
+    api.server.close(() => process.exit(0));
+  });
+}
 
 // Đọc lại state từ đĩa để đồng bộ khi telegram-bot chạy song song; bỏ qua nếu trùng dấu vân tay của ta.
 setInterval(async () => {

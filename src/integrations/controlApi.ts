@@ -77,6 +77,7 @@ export function createControlApi(options: {
   getSnapshot: () => TelegramRuntimeSnapshot;
   getCompetitorEvents?: () => CompetitorChangeEvent[];
   actions?: ControlApiActions;
+  token?: string;
   env?: Record<string, string | undefined>;
   host?: string;
   port?: number;
@@ -84,6 +85,9 @@ export function createControlApi(options: {
   const host = options.host ?? "127.0.0.1";
   const port = options.port ?? 8787;
   const env = options.env ?? process.env;
+  const token = options.token;
+  const isAuthorized = (request: IncomingMessage): boolean =>
+    !token || request.headers.authorization === `Bearer ${token}`;
   const getCompetitorEvents = options.getCompetitorEvents ?? (() => defaultCompetitorEvents());
   const eventClients = new Set<ServerResponse>();
   const server = createServer(async (request: IncomingMessage, response: ServerResponse) => {
@@ -109,7 +113,7 @@ export function createControlApi(options: {
       return;
     }
     response.setHeader("content-type", "application/json; charset=utf-8");
-    if (request.method === "GET" && request.url === "/api/health") return send(response, 200, { ok: true, service: "marketing-control-api" });
+    if (request.method === "GET" && request.url === "/api/health") return send(response, 200, { ok: true, service: "marketing-control-api", authRequired: Boolean(token) });
     if (request.method === "GET" && request.url === "/api/runtime") return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
     if (request.method === "GET" && request.url === "/api/competitors") return send(response, 200, buildCompetitorReadModel(getCompetitorEvents()));
     if (request.method === "GET" && request.url === "/api/market-research") {
@@ -153,6 +157,7 @@ export function createControlApi(options: {
     if (request.method === "POST" && request.url?.startsWith("/api/")) {
       const actions = options.actions;
       if (!actions) return send(response, 501, { error: "actions_not_supported" });
+      if (!isAuthorized(request)) return send(response, 401, { error: "unauthorized" });
       try {
         if (request.url === "/api/campaigns") {
           const body = await readJsonBody(request);
