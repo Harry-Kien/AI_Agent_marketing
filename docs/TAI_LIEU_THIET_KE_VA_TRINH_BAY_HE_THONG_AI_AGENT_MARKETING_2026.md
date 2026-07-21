@@ -230,8 +230,34 @@ flowchart LR
     AP --> WA["workflowApproval.ts"]
     BOT --> META["metaGraphAdapter.ts"]
     STORE --> CONTROL["controlApi.ts"]
+    subgraph CAP["Module năng lực chuyên biệt (F02/F03/F06/F10/F11)"]
+      RADAR["competitorMonitor.ts"]
+      RESEARCH["marketResearch.ts"]
+      VIDEO["videoGenerationAdapter.ts"]
+      ANALYTICS["campaignAnalytics.ts"]
+      COMMUNITY["communityInbox.ts"]
+    end
+    RESEARCH -.->|dùng change events| RADAR
+    COMMUNITY -.->|dùng policy| CC["customerCarePolicy.ts"]
+    RADAR --> CONTROL
+    RESEARCH --> CONTROL
+    VIDEO --> CONTROL
+    ANALYTICS --> CONTROL
+    COMMUNITY --> CONTROL
     CONTROL --> OFFICE["AgentOfficeView.tsx"]
 ```
+
+### 9.1. Module năng lực chuyên biệt và read model
+
+Ngoài lõi workflow, hệ thống có năm module năng lực thuần hàm, mỗi module có domain type (Zod), logic xác định (deterministic) và một read model đã redacted phơi qua Control API:
+
+| Module | Chức năng | Domain type | Endpoint read-only |
+|---|---|---|---|
+| `competitorMonitor.ts` | Diff hai snapshot đối thủ, khử trùng bằng `dedupKey` (F03) | `competitorTypes.ts` | `GET /api/competitors` |
+| `marketResearch.ts` | Tổng hợp insight có nguồn/bằng chứng/độ tin cậy (F02) | `marketResearchTypes.ts` | `GET /api/market-research` |
+| `videoGenerationAdapter.ts` | Guarded video job, fallback mock có contract tương đương (F06) | `mediaTypes.ts` | `GET /api/video-studio` |
+| `campaignAnalytics.ts` | So sánh KPI và sinh Learning Package (F11/F12) | `analyticsTypes.ts` | `GET /api/analytics` |
+| `communityInbox.ts` | Phân loại lead/FAQ/khiếu nại/spam, che PII (F10) | `communityTypes.ts` | `GET /api/community` |
 
 ## 10. Quy trình nghiệp vụ end-to-end
 
@@ -433,6 +459,16 @@ flowchart TD
     P7 --> META["Meta Graph"]
     META --> D1
     META --> D2
+    CS["Snapshot đối thủ (fixture)"] --> P8["8. Competitor Monitor (diff + dedup)"]
+    P8 --> P9["9. Market Research (insight + evidence)"]
+    P9 --> API
+    P8 --> API
+    P3 --> P10["10. Video Job (guarded, mock fallback)"]
+    P10 --> API
+    D1 --> P11["11. KPI + Learning Package"]
+    P11 --> API
+    CM["Comment/Inbox Page"] --> P12["12. Community Triage (+ redact PII)"]
+    P12 --> API
 ```
 
 ## 16. Mô hình dữ liệu
@@ -447,6 +483,12 @@ flowchart TD
 | RuntimeSnapshot | workflow, processedUpdateIds, botOffsets, updatedAt | Trạng thái phục hồi sau restart |
 | AgentWorkProduct | summary, deliverables, checks, risks, evidence, recommendation, score | Hợp đồng output AI |
 | PublicationEvidence | postId, permalink, publishedAt | Chứng minh xuất bản thành công |
+| CompetitorChangeEvent | id, dedupKey, competitorId, type, changeKind, impact, confidence, detectedAt | Thay đổi đối thủ đã khử trùng (F03) |
+| MarketInsight | id, campaignId, category, statement, sourceType, confidence, score, mediaAngle | Insight có nguồn và độ tin cậy (F02) |
+| MediaAsset | id, campaignId, type, status, provider, checksum, createdAt | Asset video/storyboard/audio/subtitle theo hợp đồng (F06) |
+| MetricSnapshot / KpiTarget | campaignId, values, targets, capturedAt | Chỉ số thực tế và mục tiêu KPI (F11) |
+| LearningPackage | campaignId, lessons, recommendedActions, nextCampaignHypothesis | Bài học tự cải tiến (F12) |
+| CommunityMessage | id, channel, category, priority, leadScore, action | Tương tác cộng đồng đã phân loại (F10) |
 
 ### 16.2. ERD
 
@@ -459,6 +501,11 @@ erDiagram
     CAMPAIGN ||--o| PUBLICATION_EVIDENCE : has
     RUNTIME_SNAPSHOT ||--o{ CAMPAIGN : stores
     RUNTIME_SNAPSHOT ||--o{ PROCESSED_UPDATE : deduplicates
+    CAMPAIGN ||--o{ MARKET_INSIGHT : researched_by
+    CAMPAIGN ||--o{ MEDIA_ASSET : produces
+    CAMPAIGN ||--o{ METRIC_SNAPSHOT : measured_by
+    CAMPAIGN ||--o| LEARNING_PACKAGE : learns
+    COMPETITOR_CHANGE_EVENT ||--o{ MARKET_INSIGHT : seeds
 
     CAMPAIGN {
       string id PK
@@ -493,6 +540,52 @@ erDiagram
       string postId PK
       string permalink
       datetime publishedAt
+    }
+    COMPETITOR_CHANGE_EVENT {
+      string id PK
+      string dedupKey
+      string competitorId
+      string type
+      string changeKind
+      string impact
+      number confidence
+      datetime detectedAt
+    }
+    MARKET_INSIGHT {
+      string id PK
+      string campaignId FK
+      string category
+      string statement
+      string sourceType
+      number confidence
+      number score
+    }
+    MEDIA_ASSET {
+      string id PK
+      string campaignId FK
+      string type
+      string status
+      string provider
+      string checksum
+      datetime createdAt
+    }
+    METRIC_SNAPSHOT {
+      string campaignId FK
+      string capturedAt
+      json values
+    }
+    LEARNING_PACKAGE {
+      string campaignId FK
+      string nextCampaignHypothesis
+      datetime generatedAt
+    }
+    COMMUNITY_MESSAGE {
+      string id PK
+      string channel
+      string category
+      string priority
+      number leadScore
+      string action
     }
 ```
 
@@ -624,6 +717,7 @@ flowchart TB
 
 - **Unit test:** intent resolver, schema, policy, Meta guard, Telegram authorization.
 - **Workflow test:** stage transition, revision, idempotency, publication confirmation.
+- **Module năng lực:** competitor diff + dedup, market insight, video guard/fallback, KPI + learning, community triage + redact PII (F02/F03/F06/F10/F11).
 - **Golden sequence:** chạy toàn bộ chuỗi từ natural-language intake đến publication evidence.
 - **Enterprise sequence:** chứng minh bốn stage nội bộ tự handoff và Final dừng chờ người.
 - **Browser smoke:** tám bước điều hướng, không page error.
@@ -633,9 +727,9 @@ flowchart TB
 
 | Kiểm tra | Kết quả |
 |---|---|
-| Vitest | 15 test files, 80/80 test passed |
+| Vitest | 21 test files, 126/126 test passed |
 | TypeScript typecheck | Passed |
-| Production build | Passed, 1.582 modules transformed |
+| Production build | Passed, 1.587 modules transformed |
 | Browser smoke | 8 bước, 0 page error |
 | Browser console | 0 error, 0 warning |
 | npm audit | 0 vulnerability |
@@ -808,7 +902,13 @@ src/integrations/agentWorkProduct.ts     Zod schema output AI
 src/integrations/aiProvider.ts           Prompt và 9Router adapter
 src/integrations/metaGraphAdapter.ts     Meta read/publish guard
 src/integrations/telegramStateStore.ts   Persistence và deduplication
-src/integrations/controlApi.ts           Read model và SSE
+src/integrations/competitorMonitor.ts    Diff + dedup đối thủ (F03)
+src/integrations/marketResearch.ts       Insight có nguồn/độ tin cậy (F02)
+src/integrations/videoGenerationAdapter.ts  Guarded video job (F06)
+src/integrations/campaignAnalytics.ts    KPI + Learning Package (F11/F12)
+src/integrations/communityInbox.ts       Triage cộng đồng + redact PII (F10)
+src/domain/*Types.ts                     Domain type + Zod schema
+src/integrations/controlApi.ts           Read model và SSE (9 endpoint)
 src/features/agent-office/               Dashboard trực quan
-tests/                                   Unit/integration/golden sequence
+tests/                                   Unit/integration/golden sequence (126 test)
 ```
