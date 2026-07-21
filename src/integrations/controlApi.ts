@@ -9,6 +9,7 @@ import {
   generateVideoJob,
   sampleVideoRequest
 } from "./videoGenerationAdapter";
+import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "./campaignAnalytics";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -116,6 +117,9 @@ export function createControlApi(options: {
       };
       const job = await generateVideoJob(createVideoProviderConfig(env), videoRequest);
       return send(response, 200, buildVideoStudioReadModel(job));
+    }
+    if (request.method === "GET" && request.url === "/api/analytics") {
+      return send(response, 200, buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget }));
     }
     return send(response, 404, { error: "not_found" });
   });
