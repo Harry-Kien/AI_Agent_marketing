@@ -1,4 +1,44 @@
-import type { OfficeSnapshot } from "./types";
+import type {
+  AnalyticsView,
+  CommunityView,
+  CompetitorAlertView,
+  MarketResearchView,
+  OfficeSnapshot,
+  VideoStudioView
+} from "./types";
+
+const API_BASE = "http://127.0.0.1:8787";
+
+// Fetch một endpoint read-only; nếu offline hoặc lỗi thì trả về `null` để component dùng dữ liệu mẫu.
+async function fetchJson<T>(path: string): Promise<T | null> {
+  try {
+    const response = await fetch(`${API_BASE}${path}`, { signal: AbortSignal.timeout(1800) });
+    if (!response.ok) throw new Error("offline");
+    return (await response.json()) as T;
+  } catch {
+    return null;
+  }
+}
+
+export function loadCompetitors() {
+  return fetchJson<{ connected: boolean; alerts: CompetitorAlertView[] }>("/api/competitors");
+}
+
+export function loadMarketResearch() {
+  return fetchJson<MarketResearchView>("/api/market-research");
+}
+
+export function loadVideoStudio() {
+  return fetchJson<VideoStudioView>("/api/video-studio");
+}
+
+export function loadAnalytics() {
+  return fetchJson<AnalyticsView>("/api/analytics");
+}
+
+export function loadCommunity() {
+  return fetchJson<CommunityView>("/api/community");
+}
 
 export const officeFallback: OfficeSnapshot = {
   connected: false,

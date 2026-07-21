@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { MessageCircle, Check, X, ShieldAlert, Sparkles, Send, Inbox, User, Filter, AlertTriangle } from "lucide-react";
+import { loadCommunity } from "./api";
+import type { TriagedMessageView } from "./types";
 
 interface MessageItem {
   id: string;
@@ -61,6 +63,32 @@ export function CommunityInbox() {
   const [selectedId, setSelectedId] = useState<string>("msg-2");
   const [filterType, setFilterType] = useState<"all" | "lead" | "faq" | "complaint" | "spam">("all");
   const [draftReply, setDraftReply] = useState<string>("");
+  const [connected, setConnected] = useState(false);
+
+  useEffect(() => {
+    let active = true;
+    loadCommunity().then((data) => {
+      if (!active || !data || !data.messages?.length) return;
+      setConnected(Boolean(data.connected));
+      setMessages(
+        data.messages.map((message: TriagedMessageView) => ({
+          id: message.id,
+          author: "Khách hàng (ẩn danh)",
+          platform: message.channel === "comment" ? "Facebook Post Comment" : "Messenger Inbox",
+          content: message.redactedText,
+          type: message.category === "general" ? "faq" : message.category,
+          reply: message.suggestedReply ?? "",
+          status: "pending" as const,
+          time: new Date(message.createdAt).toLocaleTimeString("vi-VN", { hour: "2-digit", minute: "2-digit" }),
+          score: message.leadScore
+        }))
+      );
+      setSelectedId(data.messages[0].id);
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const activeMessage = messages.find((m) => m.id === selectedId) || messages[0];
 
@@ -105,7 +133,12 @@ export function CommunityInbox() {
           <MessageCircle size={20} style={{ color: "var(--teal)" }} />
           <h2>Hộp thư Phân loại & Chăm sóc Leads (Community Inbox)</h2>
         </div>
-        <span className="badge urgent">{pendingCount} tin chờ duyệt</span>
+        <div style={{ display: "flex", gap: "0.4rem", alignItems: "center" }}>
+          <span className={`badge ${connected ? "ready" : "muted"}`} style={{ fontSize: "0.62rem" }}>
+            {connected ? "● Realtime" : "○ Dữ liệu mẫu"}
+          </span>
+          <span className="badge urgent">{pendingCount} tin chờ duyệt</span>
+        </div>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1.6fr", gap: "1.2rem", flex: 1, minHeight: "450px" }}>

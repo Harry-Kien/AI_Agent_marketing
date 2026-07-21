@@ -1,5 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Search, AlertTriangle, TrendingUp, Send, Check, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
+import { loadCompetitors, loadMarketResearch } from "./api";
+import type { MarketInsightView } from "./types";
 
 interface CompetitorAlert {
   id: string;
@@ -53,6 +55,24 @@ export function CompetitorList() {
   ]);
 
   const [loadingId, setLoadingId] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [insights, setInsights] = useState<MarketInsightView[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    loadCompetitors().then((data) => {
+      if (!active || !data) return;
+      setConnected(Boolean(data.connected));
+      if (data.alerts?.length) setAlerts(data.alerts.map((alert) => ({ ...alert, proposed: false })));
+    });
+    loadMarketResearch().then((data) => {
+      if (!active || !data) return;
+      setInsights(data.insights.slice(0, 5));
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handlePropose = async (id: string) => {
     setLoadingId(id);
@@ -87,9 +107,14 @@ export function CompetitorList() {
       <div className="split">
         {/* Left Side: Real-time Alert Feed */}
         <section className="panel" style={{ flex: 1.3 }}>
-          <div className="panel-title" style={{ marginBottom: "1rem" }}>
-            <Search size={18} style={{ color: "var(--violet)" }} />
-            <h2>Giám sát Đối thủ Cạnh tranh (Competitor Monitor)</h2>
+          <div className="panel-title" style={{ marginBottom: "1rem", justifyContent: "space-between" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+              <Search size={18} style={{ color: "var(--violet)" }} />
+              <h2>Giám sát Đối thủ Cạnh tranh (Competitor Monitor)</h2>
+            </div>
+            <span className={`badge ${connected ? "ready" : "muted"}`} style={{ fontSize: "0.62rem" }}>
+              {connected ? "● Realtime" : "○ Dữ liệu mẫu"}
+            </span>
           </div>
           <p style={{ color: "var(--muted)", fontSize: "0.85rem", marginBottom: "1.2rem" }}>
             Market Intelligence Agent liên tục quét các kênh truyền thông xã hội, thư viện quảng cáo và web đối thủ để phát hiện các thay đổi chiến lược.
@@ -163,70 +188,40 @@ export function CompetitorList() {
           </div>
         </section>
 
-        {/* Right Side: Analytical Market Metrics */}
+        {/* Right Side: Market Research Insights (F02, từ /api/market-research) */}
         <section className="panel" style={{ display: "flex", flexDirection: "column", gap: "1rem" }}>
           <div>
             <div className="panel-title">
               <TrendingUp size={18} style={{ color: "var(--teal)" }} />
-              <h2>Phân tích Thị phần & Share of Voice</h2>
+              <h2>Insight Thị trường (Market Research)</h2>
             </div>
             <p style={{ color: "var(--muted)", fontSize: "0.8rem", margin: "0.2rem 0 0.8rem" }}>
-              Ước tính tỉ lệ chiếm lĩnh quảng cáo trên Social Media.
+              Market Radar Agent tổng hợp insight có nguồn, độ tin cậy và góc truyền thông dùng được.
             </p>
           </div>
 
-          <div style={{ display: "grid", gap: "0.8rem", fontSize: "0.82rem" }}>
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>Thương hiệu của bạn (AI Marketing)</span>
-                <strong>42% Share</strong>
+          <div style={{ display: "grid", gap: "0.7rem", fontSize: "0.82rem" }}>
+            {insights.length > 0 ? (
+              insights.map((insight) => (
+                <div key={insight.id} style={{ border: "1px solid var(--line)", borderRadius: "6px", padding: "0.6rem" }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "0.3rem" }}>
+                    <span className="badge ready" style={{ fontSize: "0.6rem" }}>{insight.sourceType}</span>
+                    <strong style={{ fontSize: "0.72rem", color: "var(--teal)" }}>
+                      Tin cậy {Math.round(insight.confidence * 100)}%
+                    </strong>
+                  </div>
+                  <p style={{ margin: 0, fontSize: "0.78rem", lineHeight: 1.4 }}>{insight.statement}</p>
+                  <div style={{ marginTop: "0.4rem", fontSize: "0.72rem", color: "var(--blue)", display: "flex", gap: "0.3rem", alignItems: "flex-start" }}>
+                    <Sparkles size={12} style={{ flexShrink: 0, marginTop: "0.1rem", color: "var(--amber)" }} />
+                    {insight.mediaAngle}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <div style={{ display: "grid", placeItems: "center", height: "150px", border: "1px dashed var(--line)", borderRadius: "6px", color: "var(--muted)", fontSize: "0.78rem", textAlign: "center", padding: "0.5rem" }}>
+                Chưa có insight. Chạy `npm run control:api` để nhận dữ liệu Market Research thật.
               </div>
-              <div style={{ height: "8px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: "42%", height: "100%", background: "var(--teal)" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>AI Agency X</span>
-                <strong>28% Share</strong>
-              </div>
-              <div style={{ height: "8px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: "28%", height: "100%", background: "var(--violet)" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>Học viện Marketing Y</span>
-                <strong>18% Share</strong>
-              </div>
-              <div style={{ height: "8px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: "18%", height: "100%", background: "var(--blue)" }} />
-              </div>
-            </div>
-
-            <div>
-              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "0.25rem" }}>
-                <span>SaaS Ops Việt Nam & Khác</span>
-                <strong>12% Share</strong>
-              </div>
-              <div style={{ height: "8px", background: "#e2e8f0", borderRadius: "4px", overflow: "hidden" }}>
-                <div style={{ width: "12%", height: "100%", background: "var(--muted)" }} />
-              </div>
-            </div>
-          </div>
-
-          <div style={{ borderTop: "1px dashed var(--line)", paddingTop: "0.85rem", marginTop: "0.5rem" }}>
-            <span style={{ fontSize: "0.75rem", fontWeight: "bold", color: "var(--muted)", display: "block", marginBottom: "0.5rem" }}>
-              CHIẾN LƯỢC TẬP TRUNG KHUYÊN DÙNG
-            </span>
-            <div style={{ display: "flex", gap: "0.4rem", alignItems: "flex-start", fontSize: "0.8rem", lineHeight: "1.4" }}>
-              <Sparkles size={14} style={{ color: "var(--amber)", flexShrink: 0, marginTop: "0.15rem" }} />
-              <p style={{ margin: 0 }}>
-                Đối thủ đang đẩy mạnh các chiến dịch khóa học và đào tạo miễn phí để thu leads. Chúng ta nên tập trung vào <strong>giá trị automation và khả năng chạy thực chiến 24/7</strong> của hệ thống AI Agent để thu hút các tệp khách hàng SME chất lượng cao.
-              </p>
-            </div>
+            )}
           </div>
         </section>
       </div>

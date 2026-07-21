@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Video, Copy, Sparkles, Film, Check, Play, RefreshCw, FileText } from "lucide-react";
+import { loadVideoStudio } from "./api";
 
 interface CopyVariant {
   id: string;
@@ -79,6 +80,32 @@ export function ContentStudio() {
   ]);
 
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [connected, setConnected] = useState(false);
+  const [videoMode, setVideoMode] = useState<string>("");
+
+  useEffect(() => {
+    let active = true;
+    loadVideoStudio().then((data) => {
+      if (!active || !data || !data.assets?.length) return;
+      setConnected(Boolean(data.connected));
+      setVideoMode(data.mode);
+      setRenderJobs(
+        data.assets.map((asset, index) => {
+          const status = asset.ready ? "ready" : asset.status === "processing" ? "rendering" : "queued";
+          return {
+            id: `${data.jobId}-${asset.type}-${index}`,
+            name: `${asset.type.toUpperCase()} · ${data.title}`.slice(0, 46),
+            progress: asset.ready ? 100 : asset.status === "processing" ? 60 : 0,
+            status: status as RenderJob["status"],
+            eta: asset.ready ? `Hoàn tất · ${asset.provider}` : asset.status === "processing" ? "Đang render" : "Chờ hàng"
+          };
+        })
+      );
+    });
+    return () => {
+      active = false;
+    };
+  }, []);
 
   const handleCopy = (id: string, text: string) => {
     navigator.clipboard.writeText(text);
@@ -198,9 +225,14 @@ export function ContentStudio() {
 
           {/* Render Queue Card */}
           <section className="panel">
-            <div className="panel-title" style={{ marginBottom: "0.8rem" }}>
-              <Video size={18} style={{ color: "var(--teal)" }} />
-              <h2>Tiến độ Render Video AI</h2>
+            <div className="panel-title" style={{ marginBottom: "0.8rem", justifyContent: "space-between" }}>
+              <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                <Video size={18} style={{ color: "var(--teal)" }} />
+                <h2>Tiến độ Render Video AI</h2>
+              </div>
+              <span className={`badge ${connected ? "ready" : "muted"}`} style={{ fontSize: "0.62rem" }}>
+                {connected ? `● ${videoMode === "provider" ? "Provider" : "Mock"}` : "○ Dữ liệu mẫu"}
+              </span>
             </div>
 
             <div style={{ display: "grid", gap: "0.75rem" }}>

@@ -22,8 +22,8 @@ import { OperationsPanel } from "./features/agent-office/OperationsPanel";
 import { CampaignBoard } from "./features/agent-office/CampaignBoard";
 import { CompetitorList } from "./features/agent-office/CompetitorList";
 import { ContentStudio } from "./features/agent-office/ContentStudio";
-import { loadOfficeSnapshot, officeFallback } from "./features/agent-office/api";
-import type { OfficeSnapshot } from "./features/agent-office/types";
+import { loadAnalytics, loadOfficeSnapshot, officeFallback } from "./features/agent-office/api";
+import type { AnalyticsView, OfficeSnapshot } from "./features/agent-office/types";
 
 type View = "office" | "dashboard" | "campaigns" | "competitors" | "studio" | "community" | "operations";
 
@@ -48,9 +48,11 @@ function Badge({ value, tone }: { value: string; tone?: string }) {
 function App() {
   const [activeView, setActiveView] = useState<View>("office");
   const [snapshot, setSnapshot] = useState<OfficeSnapshot>(officeFallback);
+  const [analytics, setAnalytics] = useState<AnalyticsView | null>(null);
 
   const refresh = () => {
     loadOfficeSnapshot().then(setSnapshot);
+    loadAnalytics().then(setAnalytics);
   };
 
   useEffect(() => {
@@ -196,12 +198,17 @@ function App() {
           <strong>0 rủi ro</strong>
         </article>
         <article className="metric">
-          <span>Chi phí Token</span>
-          <strong>$1.45</strong>
+          <span>KPI đạt tổng thể</span>
+          <strong>{analytics ? `${Math.round(analytics.overallAttainment * 100)}%` : "—"}</strong>
         </article>
         <article className="metric ready">
-          <span>Tỷ lệ hoàn thành</span>
-          <strong>85%</strong>
+          <span>Lead so với mục tiêu</span>
+          <strong>
+            {(() => {
+              const lead = analytics?.kpis.find((kpi) => kpi.metric === "leads");
+              return lead ? `${lead.actual}/${lead.target}` : "—";
+            })()}
+          </strong>
         </article>
       </div>
 
