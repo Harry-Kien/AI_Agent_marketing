@@ -9,6 +9,7 @@
     "test": "vitest run --config vitest.config.ts",
     "typecheck": "tsc -b",
     "smoke": "node scripts/smoke-agent-flow.cjs",
+    "demo:golden": "tsx scripts/demo-golden-sequence.ts",
     "telegram:bot": "tsx scripts/telegram-bot.ts",
     "telegram:setup": "tsx scripts/telegram-setup.ts",
     "control:api": "tsx scripts/control-api.ts",
