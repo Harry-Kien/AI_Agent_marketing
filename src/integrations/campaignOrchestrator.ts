@@ -22,6 +22,7 @@ import { resolveModelRouting } from "./modelRouter";
 import { formatKnowledgeForPrompt, retrieveKnowledge } from "./knowledgeBase";
 import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
 import { evaluateAgentOutput } from "./agentEval";
+import { estimateCostUsd, estimateTokens, type AgentSpan } from "./telemetry";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -36,6 +37,7 @@ export interface OrchestratorContext {
   ai: AiProviderConfig;
   policy: ApprovalPolicyConfig;
   knowledge?: BrandKnowledgeBase;
+  onSpan?: (span: AgentSpan) => void;
   env?: Record<string, string | undefined>;
   now?: () => string;
 }
@@ -77,6 +79,7 @@ async function advanceFromRunningStage(
       const grounding = formatKnowledgeForPrompt(hits);
       if (grounding) context = `${grounding}\n\n${run.input}`;
     }
+    const startAt = now();
     const output = await generateMarketingAgentOutput(ctx.ai, {
       role: run.role,
       command: stageCommands[run.stage],
@@ -104,6 +107,28 @@ async function advanceFromRunningStage(
       ...output.product,
       quality_score: Math.min(output.product.quality_score, evaluation.score)
     };
+
+    if (ctx.onSpan) {
+      const endAt = now();
+      const tokensIn = estimateTokens(`${campaign.brief} ${context}`);
+      const tokensOut = estimateTokens(output.text);
+      ctx.onSpan({
+        runId: completed.run.id,
+        campaignId: campaign.id,
+        role: run.role,
+        stage: run.stage,
+        model: output.model,
+        tier: routing.tier,
+        mode: output.mode,
+        tokensIn,
+        tokensOut,
+        costUsd: estimateCostUsd(routing.tier, tokensIn, tokensOut),
+        evalScore: evaluation.score,
+        verdict: evaluation.verdict,
+        durationMs: Math.max(0, Date.parse(endAt) - Date.parse(startAt)),
+        at: endAt
+      });
+    }
     const decision =
       evaluation.verdict === "block"
         ? { action: "escalate" as const, reason: `Eval độc lập chặn: ${evaluation.issues[0] ?? "vi phạm an toàn thương hiệu"}` }

@@ -14,6 +14,7 @@ import {
 } from "./videoGenerationAdapter";
 import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "./campaignAnalytics";
 import { buildCommunityReadModel, sampleApprovedFaqs, sampleCommunityMessages } from "./communityInbox";
+import { buildTelemetryReadModel, type AgentSpan } from "./telemetry";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -79,6 +80,7 @@ export interface ControlApiActions {
 export function createControlApi(options: {
   getSnapshot: () => TelegramRuntimeSnapshot;
   getCompetitorEvents?: () => CompetitorChangeEvent[];
+  getSpans?: () => AgentSpan[];
   actions?: ControlApiActions;
   token?: string;
   staticDir?: string;
@@ -154,6 +156,9 @@ export function createControlApi(options: {
     }
     if (request.method === "GET" && request.url === "/api/analytics") {
       return send(response, 200, buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget }));
+    }
+    if (request.method === "GET" && request.url === "/api/telemetry") {
+      return send(response, 200, buildTelemetryReadModel(options.getSpans ? options.getSpans() : []));
     }
     if (request.method === "GET" && request.url === "/api/community") {
       return send(

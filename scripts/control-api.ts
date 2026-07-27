@@ -20,6 +20,7 @@ import { createMetaGraphClient, createMetaGraphConfig } from "../src/integration
 import { loadAppConfig } from "../src/config/appConfig";
 import { createLogger } from "../src/lib/logger";
 import { loadBrandKnowledge } from "../src/integrations/knowledgeBase";
+import { createTraceCollector } from "../src/integrations/telemetry";
 
 const envPath = resolve(process.cwd(), ".env");
 if (existsSync(envPath)) for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
@@ -38,10 +39,13 @@ let fingerprint = JSON.stringify(snapshot.workflow);
 const brandKnowledge = loadBrandKnowledge(process.env.BRAND_KNOWLEDGE_PATH ? resolve(process.env.BRAND_KNOWLEDGE_PATH) : undefined);
 log.info("Brand knowledge base đã nạp", { name: brandKnowledge.name, chunks: brandKnowledge.chunks.length });
 
+const traces = createTraceCollector(200);
+
 const orchestratorContext = (): OrchestratorContext => ({
   ai: createAiProviderConfig(process.env),
   policy: createApprovalPolicyConfig(process.env),
   knowledge: brandKnowledge,
+  onSpan: (span) => traces.record(span),
   env: process.env
 });
 
@@ -92,6 +96,7 @@ const api = createControlApi({
   host: config.controlApi.host,
   port: config.controlApi.port,
   staticDir: distDir,
+  getSpans: () => traces.list(),
   actions: {
     createCampaign: (brief) =>
       enqueue(async () => commit(await startCampaign(snapshot.workflow, orchestratorContext(), { brief, createdBy: "dashboard-operator" }))),
