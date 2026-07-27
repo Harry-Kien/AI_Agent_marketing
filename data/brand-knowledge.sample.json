@@ -1,0 +1,29 @@
+{
+  "name": "Tên doanh nghiệp của bạn",
+  "chunks": [
+    {
+      "id": "pricing-setup-sme",
+      "title": "Giá gói thiết lập AI Agent cho SME",
+      "content": "Gói thiết lập hệ thống 6 AI Agent cho doanh nghiệp SME: 4.900.000đ trọn gói một lần, đã gồm cấu hình và đào tạo. Không phí ẩn.",
+      "tags": ["giá", "gói", "sme", "setup"]
+    },
+    {
+      "id": "policy-vat",
+      "title": "Chính sách hóa đơn VAT",
+      "content": "Hỗ trợ xuất hóa đơn VAT đầy đủ cho doanh nghiệp. Thời gian xuất hóa đơn trong 3 ngày làm việc.",
+      "tags": ["vat", "hóa đơn", "chính sách"]
+    },
+    {
+      "id": "onboarding-time",
+      "title": "Thời gian triển khai",
+      "content": "Triển khai trung bình 3-5 ngày làm việc, có chuyên viên đồng hành từng bước và bàn giao tài liệu vận hành.",
+      "tags": ["triển khai", "onboarding", "thời gian"]
+    },
+    {
+      "id": "differentiator",
+      "title": "Điểm khác biệt cạnh tranh",
+      "content": "Khác biệt: vận hành human-in-the-loop, mọi bài đăng đều được người duyệt trước khi lên Facebook; không tự chi tiền, không spam.",
+      "tags": ["khác biệt", "an toàn"]
+    }
+  ]
+}

@@ -19,6 +19,8 @@ import {
 import { evaluateApprovalPolicy, type ApprovalPolicyConfig } from "./approvalPolicy";
 import { applyApprovalPolicyDecision } from "./workflowApproval";
 import { resolveModelRouting } from "./modelRouter";
+import { formatKnowledgeForPrompt, retrieveKnowledge } from "./knowledgeBase";
+import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -32,6 +34,7 @@ const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
 export interface OrchestratorContext {
   ai: AiProviderConfig;
   policy: ApprovalPolicyConfig;
+  knowledge?: BrandKnowledgeBase;
   env?: Record<string, string | undefined>;
   now?: () => string;
 }
@@ -66,11 +69,18 @@ async function advanceFromRunningStage(
     if (!campaign) break;
 
     const routing = resolveModelRouting(run.role, ctx.env ?? {});
+    // RAG: nạp căn cứ thương hiệu liên quan để agent bám dữ liệu thật thay vì bịa.
+    let context = run.input;
+    if (ctx.knowledge) {
+      const hits = retrieveKnowledge(ctx.knowledge, `${campaign.brief} ${run.stage}`, 3);
+      const grounding = formatKnowledgeForPrompt(hits);
+      if (grounding) context = `${grounding}\n\n${run.input}`;
+    }
     const output = await generateMarketingAgentOutput(ctx.ai, {
       role: run.role,
       command: stageCommands[run.stage],
       topic: campaign.brief,
-      context: run.input,
+      context,
       modelOverride: routing.model
     });
 

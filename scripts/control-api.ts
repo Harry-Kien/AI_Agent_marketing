@@ -19,6 +19,7 @@ import {
 import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
 import { loadAppConfig } from "../src/config/appConfig";
 import { createLogger } from "../src/lib/logger";
+import { loadBrandKnowledge } from "../src/integrations/knowledgeBase";
 
 const envPath = resolve(process.cwd(), ".env");
 if (existsSync(envPath)) for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
@@ -34,9 +35,13 @@ const statePath = resolve(process.cwd(), config.statePath);
 let snapshot = (await loadRuntimeSnapshot(statePath, () => createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() }))).snapshot;
 let fingerprint = JSON.stringify(snapshot.workflow);
 
+const brandKnowledge = loadBrandKnowledge(process.env.BRAND_KNOWLEDGE_PATH ? resolve(process.env.BRAND_KNOWLEDGE_PATH) : undefined);
+log.info("Brand knowledge base đã nạp", { name: brandKnowledge.name, chunks: brandKnowledge.chunks.length });
+
 const orchestratorContext = (): OrchestratorContext => ({
   ai: createAiProviderConfig(process.env),
   policy: createApprovalPolicyConfig(process.env),
+  knowledge: brandKnowledge,
   env: process.env
 });
 
