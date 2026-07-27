@@ -36,7 +36,8 @@ let fingerprint = JSON.stringify(snapshot.workflow);
 
 const orchestratorContext = (): OrchestratorContext => ({
   ai: createAiProviderConfig(process.env),
-  policy: createApprovalPolicyConfig(process.env)
+  policy: createApprovalPolicyConfig(process.env),
+  env: process.env
 });
 
 // Publisher thật chỉ dùng khi Meta được bật; nếu không, orchestrator hoàn tất bằng bằng chứng mock.

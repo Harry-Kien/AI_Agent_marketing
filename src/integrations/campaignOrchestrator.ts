@@ -18,6 +18,7 @@ import {
 } from "./marketingWorkflow";
 import { evaluateApprovalPolicy, type ApprovalPolicyConfig } from "./approvalPolicy";
 import { applyApprovalPolicyDecision } from "./workflowApproval";
+import { resolveModelRouting } from "./modelRouter";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -31,6 +32,7 @@ const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
 export interface OrchestratorContext {
   ai: AiProviderConfig;
   policy: ApprovalPolicyConfig;
+  env?: Record<string, string | undefined>;
   now?: () => string;
 }
 
@@ -63,11 +65,13 @@ async function advanceFromRunningStage(
     const campaign = current.campaigns.find((item) => item.id === run.campaignId);
     if (!campaign) break;
 
+    const routing = resolveModelRouting(run.role, ctx.env ?? {});
     const output = await generateMarketingAgentOutput(ctx.ai, {
       role: run.role,
       command: stageCommands[run.stage],
       topic: campaign.brief,
-      context: run.input
+      context: run.input,
+      modelOverride: routing.model
     });
 
     const completed = completeRun(current, run.id, output.text, now, {

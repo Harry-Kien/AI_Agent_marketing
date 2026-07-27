@@ -15,6 +15,8 @@ export interface MarketingPromptInput {
   command: string;
   topic: string;
   context?: string;
+  // Model do model-router chọn theo vai trò; nếu bỏ trống dùng config.model.
+  modelOverride?: string;
 }
 
 export interface MarketingPrompt {
@@ -26,6 +28,7 @@ export interface MarketingAgentOutput {
   mode: "ai" | "mock";
   text: string;
   product: AgentWorkProduct;
+  model: string;
   fallbackReason?: string;
 }
 
@@ -178,12 +181,14 @@ export async function generateMarketingAgentOutput(
   fetchImpl: FetchLike = fetch
 ): Promise<MarketingAgentOutput> {
   const prompt = buildMarketingPrompt(input);
+  const model = input.modelOverride ?? config.model;
   if (!config.enabled) {
     const product = buildMockProduct(input);
     return {
       mode: "mock",
       text: formatAgentWorkProduct(product),
-      product
+      product,
+      model
     };
   }
 
@@ -204,7 +209,7 @@ export async function generateMarketingAgentOutput(
         headers,
         signal: AbortSignal.timeout(config.timeoutMs ?? defaultTimeoutMs),
         body: JSON.stringify({
-          model: config.model,
+          model,
           messages: [
             { role: "system", content: prompt.system },
             { role: "user", content: prompt.user }
@@ -232,7 +237,7 @@ export async function generateMarketingAgentOutput(
       if (input.role === "manager" && input.command === "finalize" && !parsed.data.publication_content) {
         throw new Error("AI provider returned output that failed schema validation: final publication_content is missing");
       }
-      return { mode: "ai", text: formatAgentWorkProduct(parsed.data), product: parsed.data };
+      return { mode: "ai", text: formatAgentWorkProduct(parsed.data), product: parsed.data, model };
     } catch (error) {
       lastError = normalizeProviderError(error);
       if (attempt < maxRetries) {
@@ -246,6 +251,7 @@ export async function generateMarketingAgentOutput(
     mode: "mock",
     text: formatAgentWorkProduct(product),
     product,
+    model,
     fallbackReason: lastError
   };
 }
