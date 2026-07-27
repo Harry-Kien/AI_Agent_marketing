@@ -21,6 +21,7 @@ import { applyApprovalPolicyDecision } from "./workflowApproval";
 import { resolveModelRouting } from "./modelRouter";
 import { formatKnowledgeForPrompt, retrieveKnowledge } from "./knowledgeBase";
 import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
+import { evaluateAgentOutput } from "./agentEval";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -96,14 +97,24 @@ async function advanceFromRunningStage(
         (item) => item.campaignId === completed.run.campaignId && item.stage === completed.run.stage
       ).length - 1
     );
-    const decision = evaluateApprovalPolicy({
-      config: ctx.policy,
-      stage: completed.run.stage,
-      product: output.product,
-      outputMode: output.mode,
-      fallbackReason: output.fallbackReason,
-      revisionCount
-    });
+
+    // Eval độc lập: không tin điểm agent tự khai. Cap điểm hiệu dụng và chặn nếu vi phạm an toàn.
+    const evaluation = await evaluateAgentOutput(output.product, { topic: campaign.brief, ai: ctx.ai });
+    const effectiveProduct = {
+      ...output.product,
+      quality_score: Math.min(output.product.quality_score, evaluation.score)
+    };
+    const decision =
+      evaluation.verdict === "block"
+        ? { action: "escalate" as const, reason: `Eval độc lập chặn: ${evaluation.issues[0] ?? "vi phạm an toàn thương hiệu"}` }
+        : evaluateApprovalPolicy({
+            config: ctx.policy,
+            stage: completed.run.stage,
+            product: effectiveProduct,
+            outputMode: output.mode,
+            fallbackReason: output.fallbackReason,
+            revisionCount
+          });
 
     if (decision.action === "human_approval") break;
     const applied = applyApprovalPolicyDecision(current, completed.run.id, decision, now);
