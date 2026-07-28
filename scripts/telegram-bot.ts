@@ -6,6 +6,9 @@ import {
   generateMarketingAgentOutput,
   type MarketingAgentOutput
 } from "../src/integrations/aiProvider";
+import { resolveModelRouting } from "../src/integrations/modelRouter";
+import { evaluateAgentOutput } from "../src/integrations/agentEval";
+import { formatKnowledgeForPrompt, loadBrandKnowledge, retrieveKnowledge } from "../src/integrations/knowledgeBase";
 import {
   approveRunAndPreparePublication,
   completePublication,
@@ -99,6 +102,17 @@ const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
   brand: "review",
   final: "finalize"
 };
+
+// Nạp tri thức thương hiệu một lần (sau khi .env đã vào process.env).
+let cachedKnowledge: ReturnType<typeof loadBrandKnowledge> | null = null;
+function brandKnowledge() {
+  if (!cachedKnowledge) {
+    cachedKnowledge = loadBrandKnowledge(
+      process.env.BRAND_KNOWLEDGE_PATH ? resolve(process.env.BRAND_KNOWLEDGE_PATH) : undefined
+    );
+  }
+  return cachedKnowledge;
+}
 
 const roleUpdatePrefixes: Record<MarketingBotRole, number> = {
   manager: 1,
@@ -355,11 +369,19 @@ async function runWorkflowStage(
   await sendTyping(target.token, chatId);
   await wait(700);
 
+  // Intelligence stack: định tuyến model theo vai trò + RAG grounding từ tri thức thương hiệu.
+  const routing = resolveModelRouting(run.role, process.env);
+  let stageContext = run.input;
+  const knowledgeHits = retrieveKnowledge(brandKnowledge(), `${campaign.brief} ${run.stage}`, 3);
+  const grounding = formatKnowledgeForPrompt(knowledgeHits);
+  if (grounding) stageContext = `${grounding}\n\n${stageContext}`;
+
   const output = await generateMarketingAgentOutput(createAiProviderConfig(process.env), {
     role: run.role,
     command: stageCommands[run.stage],
     topic: campaign.brief,
-    context: run.input
+    context: stageContext,
+    modelOverride: routing.model
   });
 
   const completedRun = await mutateRuntime(controller, (snapshot) => {
@@ -384,14 +406,26 @@ async function runWorkflowStage(
       (item) => item.campaignId === completedRun.campaignId && item.stage === completedRun.stage
     ).length - 1
   );
-  const policyDecision = evaluateApprovalPolicy({
-    config: createApprovalPolicyConfig(process.env),
-    stage: completedRun.stage,
-    product: output.product,
-    outputMode: output.mode,
-    fallbackReason: output.fallbackReason,
-    revisionCount
+  // Eval độc lập: không tin điểm agent tự khai; cap điểm hiệu dụng, chặn nếu vi phạm an toàn.
+  const evaluation = await evaluateAgentOutput(output.product, {
+    topic: campaign.brief,
+    ai: createAiProviderConfig(process.env)
   });
+  const effectiveProduct = {
+    ...output.product,
+    quality_score: Math.min(output.product.quality_score, evaluation.score)
+  };
+  const policyDecision =
+    evaluation.verdict === "block"
+      ? { action: "escalate" as const, reason: `Eval độc lập chặn: ${evaluation.issues[0] ?? "vi phạm an toàn thương hiệu"}` }
+      : evaluateApprovalPolicy({
+          config: createApprovalPolicyConfig(process.env),
+          stage: completedRun.stage,
+          product: effectiveProduct,
+          outputMode: output.mode,
+          fallbackReason: output.fallbackReason,
+          revisionCount
+        });
 
   if (policyDecision.action === "human_approval") {
     await sendTyping(target.token, chatId);
@@ -665,7 +699,8 @@ async function handleLegacyCommand(
       role: config.role,
       command: parsed.command,
       topic: parsed.args.join(" ").trim() || "AI Agent cho SME",
-      context: "Yêu cầu trực tiếp ngoài workflow chiến dịch; kết quả chưa được đưa vào Stage-Gate."
+      context: "Yêu cầu trực tiếp ngoài workflow chiến dịch; kết quả chưa được đưa vào Stage-Gate.",
+      modelOverride: resolveModelRouting(config.role, process.env).model
     });
     await sendMessage(config.token, chatId, [
       `${config.displayName} - tư vấn chuyên môn độc lập`,
