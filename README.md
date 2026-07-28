@@ -32,16 +32,48 @@ Admin chat mục tiêu
 
 Mọi bước đăng bài, trả lời nội dung nhạy cảm, chạy ads, chi tiền, xóa/chặn, merge hoặc deploy đều không được tự động thực hiện.
 
+Dashboard không chỉ để xem: qua Control API (write-path có bảo vệ token) người vận hành có thể **khởi chạy chiến dịch, duyệt, từ chối, xác nhận đăng** ngay trên giao diện — cùng điều khiển một state machine với Telegram.
+
+## Năng lực nghiệp vụ (F01–F12)
+
+| Mã | Chức năng | Module |
+|---|---|---|
+| F02 | Nghiên cứu thị trường (insight có nguồn) | `marketResearch.ts` |
+| F03 | Theo dõi đối thủ (diff + chống trùng) | `competitorMonitor.ts` |
+| F06 | Tạo video (guarded, mock fallback) | `videoGenerationAdapter.ts` |
+| F10 | Chăm sóc cộng đồng (+ che PII) | `communityInbox.ts` |
+| F11/F12 | Đo lường + Learning Package | `campaignAnalytics.ts` |
+
+Mỗi module có domain type (Zod), logic thuần và read model đã redacted phơi qua Control API.
+
+## Agent Intelligence Stack (chuẩn ngành 2026)
+
+Đủ 7 mối quan tâm lõi của agent stack hiện đại:
+
+| Concern | Hiện thực |
+|---|---|
+| Orchestration | Stage-gate state machine + HITL checkpoint + recovery (`marketingWorkflow.ts`, `campaignOrchestrator.ts`) |
+| Governance | Policy tự duyệt + guarded adapter + audit + 2-lớp phê duyệt |
+| Models | Định tuyến model theo agent (`modelRouter.ts`) — việc khó→mạnh, nhẹ→rẻ |
+| Knowledge (RAG) | Brand Knowledge Base + retrieval BM25-lite (`knowledgeBase.ts`) — agent bám dữ liệu thật |
+| Eval | Judge độc lập (LLM-as-judge + heuristic), chặn claim phóng đại (`agentEval.ts`) |
+| Observability | Trace/span mỗi lượt agent + chi phí + drift (`telemetry.ts`, `GET /api/telemetry`) |
+| Memory | Ký ức chiến dịch dài hạn, agent học từ lịch sử (`campaignMemory.ts`, `GET /api/memory`) |
+
+Tất cả chạy mock/heuristic khi chưa có key và tự bật chế độ thật khi cắm `NINE_ROUTER_API_KEY` — không cần sửa code.
+
 ## Tech stack
 
-- React 18, Vite 6, TypeScript, Lucide
+- React 18, Vite 6, TypeScript (strict), Lucide
 - Telegram Bot API long polling
-- 9Router/OpenAI-compatible Chat Completions
-- Meta Graph API v23.0
-- Zod strict schema validation cho output Agent
-- Local atomic JSON runtime state
-- Local HTTP/SSE control API tại `127.0.0.1:8787`
-- Vitest, jsdom và Playwright CLI
+- 9Router/OpenAI-compatible Chat Completions + định tuyến model theo tier
+- Meta Graph API v23.0 (guarded)
+- Zod strict schema validation cho mọi input ngoài
+- Persistence: atomic JSON runtime state + backup xoay vòng (10 bản)
+- Control API `node:http` (GET read model + SSE + POST write-path) phục vụ luôn dashboard tĩnh khi build
+- Bảo mật: bearer-token auth cho write-path, rate-limit per-IP, security headers, config validation (Zod), structured logging có redaction
+- Đóng gói: Docker multi-stage 1-container (dashboard + API cùng origin)
+- Vitest (172 test), jsdom và Playwright CLI
 
 ## Cài đặt
 
@@ -63,12 +95,18 @@ MARKETING_APPROVAL_MODE=enterprise-risk-based
 
 ## Chạy local
 
-Mở ba terminal:
+Mở ba terminal (dev server 5173, `npm run dev` là đủ — CORS cho phép mọi origin loopback):
 
 ```powershell
-npm run dev -- --port 5174
+npm run dev
 npm run control:api
 npm run telegram:bot
+```
+
+Xem toàn luồng chạy thử một lệnh (mock, không cần key):
+
+```powershell
+npm run demo:golden
 ```
 
 Thiết lập profile/menu Telegram (chỉ chạy khi mới tạo bot hoặc đổi menu):
@@ -77,7 +115,19 @@ Thiết lập profile/menu Telegram (chỉ chạy khi mới tạo bot hoặc đ�
 npm run telegram:setup
 ```
 
-Dashboard: `http://127.0.0.1:5174/`
+Dashboard: `http://127.0.0.1:5173/`
+
+## Triển khai production (self-hosted, 1 doanh nghiệp)
+
+Một container phục vụ cả dashboard lẫn Control API cùng origin:
+
+```bash
+echo "CONTROL_API_TOKEN=$(node -e "console.log(require('crypto').randomBytes(24).toString('hex'))")" > .env
+docker compose up -d --build
+# Mở http://<IP-máy-chủ>:8787 -> nhập token -> điều khiển thật
+```
+
+Hướng dẫn đầy đủ (backup, HTTPS/reverse proxy, cắm key thật): `docs/operations/DEPLOYMENT.md`.
 
 ## Chat không cần lệnh slash
 
@@ -119,15 +169,22 @@ git diff --check
 
 ```text
 scripts/telegram-bot.ts                  Bộ điều phối sáu bot
-scripts/telegram-setup.ts                Profile và menu Telegram
-scripts/control-api.ts                   API local cho dashboard
+scripts/control-api.ts                   Control API + write-path + phục vụ dashboard
+scripts/demo-golden-sequence.ts          Demo F01-F12 một lệnh (mock)
 src/integrations/marketingWorkflow.ts    Stage-gate và publication state
+src/integrations/campaignOrchestrator.ts Điều phối vòng đời (không cần Telegram)
 src/integrations/managerIntent.ts        Hiểu ý định tiếng Việt
-src/integrations/aiProvider.ts            Prompt vai trò và 9Router
-src/integrations/metaGraphAdapter.ts      Meta read/publish guard
-src/integrations/customerCarePolicy.ts   Chính sách CSKH
+src/integrations/aiProvider.ts           Prompt vai trò và 9Router
+src/integrations/modelRouter.ts          Định tuyến model theo agent
+src/integrations/knowledgeBase.ts        Brand Knowledge Base + RAG
+src/integrations/agentEval.ts            Eval độc lập (judge)
+src/integrations/telemetry.ts            Trace/span + chi phí
+src/integrations/campaignMemory.ts       Ký ức chiến dịch dài hạn
+src/integrations/metaGraphAdapter.ts     Meta read/publish guard
+src/config/appConfig.ts · src/lib/logger.ts   Config validation + logging
 src/features/agent-office/               Phòng Agent trực quan
-docs/operations/                          Kịch bản demo và readiness
+docs/operations/DEPLOYMENT.md            Hướng dẫn triển khai Docker
+docs/MA_TRAN_TRUY_VET_F01_F12.md         Ma trận truy vết chức năng
 ```
 
 ## Trạng thái production

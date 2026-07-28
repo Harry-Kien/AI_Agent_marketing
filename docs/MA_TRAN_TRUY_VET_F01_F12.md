@@ -2,7 +2,7 @@
 
 Bảng truy vết chứng minh mọi chức năng nghiệp vụ (F01–F12) đều có **hiện thực code → endpoint → test → sơ đồ → cách tái lập bằng chứng**. Dùng khi bảo vệ khóa luận để trả lời "chức năng X nằm ở đâu, kiểm chứng thế nào".
 
-Cập nhật: 2026-07-21 · Trạng thái: 21 test files / 126 test passed · typecheck + build sạch.
+Cập nhật: 2026-07-28 · Trạng thái: 29 test files / 172 test passed · typecheck + build sạch.
 
 ## 1. Ma trận chức năng
 
@@ -43,6 +43,18 @@ npm run docs:thesis   # sinh lại 13 sơ đồ + thesis docx
 ```
 
 Chạy live (cần cấu hình `.env`): `npm run control:api` + `npm run telegram:bot` + `npm run audit:system`.
+
+## 3b. Agent Intelligence Stack (chuẩn ngành 2026)
+
+| Concern | Module | Endpoint | Test |
+|---------|--------|----------|------|
+| Models — định tuyến theo agent | `modelRouter.ts` | (nội bộ) | `modelRouter.test.ts` |
+| Knowledge — RAG grounding | `knowledgeBase.ts` | (prompt) | `knowledgeBase.test.ts` |
+| Eval — judge độc lập | `agentEval.ts` | (quality gate) | `agentEval.test.ts` |
+| Observability — trace + cost | `telemetry.ts` | `GET /api/telemetry` | `telemetry.test.ts` |
+| Memory — học từ lịch sử | `campaignMemory.ts` | `GET /api/memory` | `campaignMemory.test.ts` |
+
+Governance + Orchestration + HITL đã nằm ở bảng F01–F12 và mục 2 (phi chức năng).
 
 ## 4. Ánh xạ 6 Agent ↔ chức năng
 

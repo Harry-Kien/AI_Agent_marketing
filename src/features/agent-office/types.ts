@@ -99,3 +99,34 @@ export interface CommunityView {
   escalations: number;
   messages: TriagedMessageView[];
 }
+
+export interface TelemetryView {
+  connected: boolean;
+  totals: { spans: number; totalCostUsd: number; avgEvalScore: number; avgDurationMs: number; driftRatio: number };
+  byTier: Array<{ tier: "strong" | "balanced" | "light"; spans: number; costUsd: number }>;
+  recent: Array<{
+    runId: string;
+    role: string;
+    stage: string;
+    tier: string;
+    model: string;
+    mode: "ai" | "mock";
+    costUsd: number;
+    evalScore: number;
+    verdict: "pass" | "revise" | "block";
+    at: string;
+  }>;
+}
+
+export interface MemoryView {
+  connected: boolean;
+  count: number;
+  memories: Array<{
+    campaignId: string;
+    brief: string;
+    overallAttainment: number;
+    lessons: string[];
+    tags: string[];
+    createdAt: string;
+  }>;
+}

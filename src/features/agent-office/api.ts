@@ -3,7 +3,9 @@ import type {
   CommunityView,
   CompetitorAlertView,
   MarketResearchView,
+  MemoryView,
   OfficeSnapshot,
+  TelemetryView,
   VideoStudioView
 } from "./types";
 
@@ -40,6 +42,14 @@ export function loadAnalytics() {
 
 export function loadCommunity() {
   return fetchJson<CommunityView>("/api/community");
+}
+
+export function loadTelemetry() {
+  return fetchJson<TelemetryView>("/api/telemetry");
+}
+
+export function loadMemory() {
+  return fetchJson<MemoryView>("/api/memory");
 }
 
 export const officeFallback: OfficeSnapshot = {
