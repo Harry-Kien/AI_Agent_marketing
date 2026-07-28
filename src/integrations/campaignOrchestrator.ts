@@ -23,6 +23,8 @@ import { formatKnowledgeForPrompt, retrieveKnowledge } from "./knowledgeBase";
 import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
 import { evaluateAgentOutput } from "./agentEval";
 import { estimateCostUsd, estimateTokens, type AgentSpan } from "./telemetry";
+import { formatMemoriesForPrompt, retrieveMemories } from "./campaignMemory";
+import type { CampaignMemory } from "../domain/memoryTypes";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
 const stageCommands: Record<MarketingAgentRunRuntime["stage"], string> = {
@@ -37,6 +39,7 @@ export interface OrchestratorContext {
   ai: AiProviderConfig;
   policy: ApprovalPolicyConfig;
   knowledge?: BrandKnowledgeBase;
+  memories?: CampaignMemory[];
   onSpan?: (span: AgentSpan) => void;
   env?: Record<string, string | undefined>;
   now?: () => string;
@@ -77,7 +80,13 @@ async function advanceFromRunningStage(
     if (ctx.knowledge) {
       const hits = retrieveKnowledge(ctx.knowledge, `${campaign.brief} ${run.stage}`, 3);
       const grounding = formatKnowledgeForPrompt(hits);
-      if (grounding) context = `${grounding}\n\n${run.input}`;
+      if (grounding) context = `${grounding}\n\n${context}`;
+    }
+    // Memory: giai đoạn nghiên cứu học từ chiến dịch trước (chuẩn "memory" 2026).
+    if (run.stage === "research" && ctx.memories?.length) {
+      const memoryHits = retrieveMemories(ctx.memories, campaign.brief, 2);
+      const recall = formatMemoriesForPrompt(memoryHits);
+      if (recall) context = `${recall}\n\n${context}`;
     }
     const startAt = now();
     const output = await generateMarketingAgentOutput(ctx.ai, {

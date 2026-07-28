@@ -21,6 +21,8 @@ import { loadAppConfig } from "../src/config/appConfig";
 import { createLogger } from "../src/lib/logger";
 import { loadBrandKnowledge } from "../src/integrations/knowledgeBase";
 import { createTraceCollector } from "../src/integrations/telemetry";
+import { appendCampaignMemory, buildCampaignMemory, loadCampaignMemories } from "../src/integrations/campaignMemory";
+import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "../src/integrations/campaignAnalytics";
 
 const envPath = resolve(process.cwd(), ".env");
 if (existsSync(envPath)) for (const line of readFileSync(envPath, "utf8").split(/\r?\n/)) {
@@ -40,11 +42,15 @@ const brandKnowledge = loadBrandKnowledge(process.env.BRAND_KNOWLEDGE_PATH ? res
 log.info("Brand knowledge base đã nạp", { name: brandKnowledge.name, chunks: brandKnowledge.chunks.length });
 
 const traces = createTraceCollector(200);
+const memoryPath = resolve(dirname(statePath), "campaign-memory.json");
+let memories = loadCampaignMemories(memoryPath);
+log.info("Ký ức chiến dịch đã nạp", { count: memories.length });
 
 const orchestratorContext = (): OrchestratorContext => ({
   ai: createAiProviderConfig(process.env),
   policy: createApprovalPolicyConfig(process.env),
   knowledge: brandKnowledge,
+  memories,
   onSpan: (span) => traces.record(span),
   env: process.env
 });
@@ -97,6 +103,7 @@ const api = createControlApi({
   port: config.controlApi.port,
   staticDir: distDir,
   getSpans: () => traces.list(),
+  getMemories: () => memories,
   actions: {
     createCampaign: (brief) =>
       enqueue(async () => commit(await startCampaign(snapshot.workflow, orchestratorContext(), { brief, createdBy: "dashboard-operator" }))),
@@ -107,7 +114,17 @@ const api = createControlApi({
     requestPublication: () =>
       enqueue(async () => commit(requestPublication(snapshot.workflow, "dashboard-operator"))),
     confirmPublication: () =>
-      enqueue(async () => commit(await confirmPublicationFlow(snapshot.workflow, { actorId: "dashboard-operator", publisher: metaPublisher() })))
+      enqueue(async () => {
+        const next = await confirmPublicationFlow(snapshot.workflow, { actorId: "dashboard-operator", publisher: metaPublisher() });
+        await commit(next);
+        // Học từ chiến dịch vừa xuất bản: ghi ký ức để agent dùng cho lần sau.
+        const campaign = next.campaigns[next.campaigns.length - 1];
+        if (campaign?.stage === "published") {
+          const analytics = buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget });
+          memories = appendCampaignMemory(memoryPath, buildCampaignMemory({ campaignId: campaign.id, brief: campaign.brief, analytics }));
+          log.info("Đã ghi ký ức chiến dịch", { campaignId: campaign.id, total: memories.length });
+        }
+      })
   }
 });
 

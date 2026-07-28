@@ -15,6 +15,8 @@ import {
 import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "./campaignAnalytics";
 import { buildCommunityReadModel, sampleApprovedFaqs, sampleCommunityMessages } from "./communityInbox";
 import { buildTelemetryReadModel, type AgentSpan } from "./telemetry";
+import { buildMemoryReadModel } from "./campaignMemory";
+import type { CampaignMemory } from "../domain/memoryTypes";
 
 const agentRoster = [
   ["manager", "AI Marketing Manager", "Điều phối & phê duyệt"],
@@ -81,6 +83,7 @@ export function createControlApi(options: {
   getSnapshot: () => TelegramRuntimeSnapshot;
   getCompetitorEvents?: () => CompetitorChangeEvent[];
   getSpans?: () => AgentSpan[];
+  getMemories?: () => CampaignMemory[];
   actions?: ControlApiActions;
   token?: string;
   staticDir?: string;
@@ -159,6 +162,9 @@ export function createControlApi(options: {
     }
     if (request.method === "GET" && request.url === "/api/telemetry") {
       return send(response, 200, buildTelemetryReadModel(options.getSpans ? options.getSpans() : []));
+    }
+    if (request.method === "GET" && request.url === "/api/memory") {
+      return send(response, 200, buildMemoryReadModel(options.getMemories ? options.getMemories() : []));
     }
     if (request.method === "GET" && request.url === "/api/community") {
       return send(
