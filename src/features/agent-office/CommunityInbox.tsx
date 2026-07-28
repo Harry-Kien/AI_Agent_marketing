@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { MessageCircle, Check, X, ShieldAlert, Sparkles, Send, Inbox, User, Filter, AlertTriangle } from "lucide-react";
-import { loadCommunity } from "./api";
+import { loadCommunity, postControlAction } from "./api";
 import type { TriagedMessageView } from "./types";
 
 interface MessageItem {
@@ -98,7 +98,9 @@ export function CommunityInbox() {
     setDraftReply(msg.reply);
   };
 
-  const handleSend = (id: string) => {
+  const handleSend = async (id: string) => {
+    // Nối write-path: ghi nhận phản hồi đã duyệt ở backend (guarded). Optimistic UI cho chế độ demo.
+    await postControlAction("/api/community/reply", { messageId: id, reply: draftReply });
     setMessages((prev) =>
       prev.map((msg) => (msg.id === id ? { ...msg, reply: draftReply, status: "sent" as const } : msg))
     );

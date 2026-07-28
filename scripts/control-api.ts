@@ -113,6 +113,14 @@ const api = createControlApi({
       enqueue(async () => commit(await rejectActive(snapshot.workflow, orchestratorContext(), { feedback, actorId: "dashboard-operator" }))),
     requestPublication: () =>
       enqueue(async () => commit(requestPublication(snapshot.workflow, "dashboard-operator"))),
+    replyCommunity: ({ messageId, reply }) => {
+      // Phản hồi đã được người vận hành duyệt. Gửi Meta thật cần META_AUTO_REPLY_ENABLED + Graph comment API (guarded).
+      log.info("Phản hồi cộng đồng đã duyệt", {
+        messageId,
+        replyPreview: reply.slice(0, 80),
+        metaAutoReply: process.env.META_AUTO_REPLY_ENABLED === "true"
+      });
+    },
     confirmPublication: () =>
       enqueue(async () => {
         const next = await confirmPublicationFlow(snapshot.workflow, { actorId: "dashboard-operator", publisher: metaPublisher() });

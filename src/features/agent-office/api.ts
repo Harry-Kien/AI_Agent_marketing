@@ -52,6 +52,24 @@ export function loadMemory() {
   return fetchJson<MemoryView>("/api/memory");
 }
 
+// Gửi hành động ghi tới Control API, tự ký bằng token lưu ở localStorage. Trả true nếu thành công.
+export async function postControlAction(path: string, body?: unknown): Promise<boolean> {
+  try {
+    const token = localStorage.getItem("controlApiToken") ?? "";
+    const headers: Record<string, string> = { "content-type": "application/json" };
+    if (token) headers.authorization = `Bearer ${token}`;
+    const response = await fetch(`${API_BASE}${path}`, {
+      method: "POST",
+      headers,
+      body: body ? JSON.stringify(body) : undefined,
+      signal: AbortSignal.timeout(4000)
+    });
+    return response.ok;
+  } catch {
+    return false;
+  }
+}
+
 export const officeFallback: OfficeSnapshot = {
   connected: false,
   campaignId: "CMP-DEMO-AI-SME",

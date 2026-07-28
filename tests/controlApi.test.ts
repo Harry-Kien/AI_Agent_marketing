@@ -75,6 +75,38 @@ describe("local control API read model", () => {
     }
   });
 
+  it("nối write-path phản hồi cộng đồng, validate thiếu trường", async () => {
+    const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
+    const replies: Array<{ messageId: string; reply: string }> = [];
+    const api = createControlApi({
+      getSnapshot: () => snapshot,
+      actions: { replyCommunity: (input) => { replies.push(input); } },
+      port: 0
+    });
+    await api.listen();
+    const address = api.server.address();
+    if (!address || typeof address === "string") throw new Error("Test server did not bind.");
+    const base = `http://127.0.0.1:${address.port}`;
+    try {
+      const ok = await fetch(`${base}/api/community/reply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messageId: "msg-1", reply: "Chào bạn, cảm ơn đã quan tâm." })
+      });
+      expect(ok.status).toBe(200);
+      expect(replies).toEqual([{ messageId: "msg-1", reply: "Chào bạn, cảm ơn đã quan tâm." }]);
+
+      const bad = await fetch(`${base}/api/community/reply`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ messageId: "msg-1" })
+      });
+      expect(bad.status).toBe(400);
+    } finally {
+      api.server.close();
+    }
+  });
+
   it("bảo vệ write-path bằng bearer token khi có token", async () => {
     const snapshot = createRuntimeSnapshot({ telegramSession: createTelegramSession(seedData), workflow: createEmptyWorkflowState() });
     let approved = 0;

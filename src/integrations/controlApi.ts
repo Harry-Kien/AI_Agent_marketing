@@ -77,6 +77,7 @@ export interface ControlApiActions {
   rejectActive?: (feedback: string) => Promise<void> | void;
   requestPublication?: () => Promise<void> | void;
   confirmPublication?: () => Promise<void> | void;
+  replyCommunity?: (input: { messageId: string; reply: string }) => Promise<void> | void;
 }
 
 export function createControlApi(options: {
@@ -206,6 +207,14 @@ export function createControlApi(options: {
         if (request.url === "/api/publication/confirm") {
           await actions.confirmPublication?.();
           return send(response, 200, buildOfficeReadModel(options.getSnapshot()));
+        }
+        if (request.url === "/api/community/reply") {
+          const body = await readJsonBody(request);
+          const messageId = typeof body.messageId === "string" ? body.messageId : "";
+          const reply = typeof body.reply === "string" ? body.reply.trim() : "";
+          if (!messageId || !reply) return send(response, 400, { error: "message_and_reply_required" });
+          await actions.replyCommunity?.({ messageId, reply });
+          return send(response, 200, { ok: true });
         }
       } catch (error) {
         return send(response, 409, { error: error instanceof Error ? error.message : "action_failed" });

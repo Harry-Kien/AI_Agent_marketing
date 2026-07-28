@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { Search, AlertTriangle, TrendingUp, Send, Check, ShieldAlert, Sparkles, RefreshCw } from "lucide-react";
-import { loadCompetitors, loadMarketResearch } from "./api";
+import { loadCompetitors, loadMarketResearch, postControlAction } from "./api";
 import type { MarketInsightView } from "./types";
 
 interface CompetitorAlert {
@@ -75,12 +75,16 @@ export function CompetitorList() {
   }, []);
 
   const handlePropose = async (id: string) => {
+    const target = alerts.find((item) => item.id === id);
+    if (!target) return;
     setLoadingId(id);
-    // Simulate API call proposing this competitor action as a research seed
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    setAlerts((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, proposed: true } : item))
-    );
+    // Nối write-path thật: seed một chiến dịch phản công từ đề xuất của radar.
+    const brief = `Chiến dịch phản hồi đối thủ ${target.name}: ${target.suggestedAction}`;
+    const ok = await postControlAction("/api/campaigns", { brief });
+    if (!ok) {
+      window.alert("Không tạo được chiến dịch. Hãy chạy `npm run control:api` và nhập token điều khiển ở tab Tổng quan.");
+    }
+    setAlerts((prev) => prev.map((item) => (item.id === id ? { ...item, proposed: ok } : item)));
     setLoadingId(null);
   };
 
