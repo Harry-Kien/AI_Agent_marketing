@@ -259,6 +259,20 @@ Ngoài lõi workflow, hệ thống có năm module năng lực thuần hàm, m�
 | `campaignAnalytics.ts` | So sánh KPI và sinh Learning Package (F11/F12) | `analyticsTypes.ts` | `GET /api/analytics` |
 | `communityInbox.ts` | Phân loại lead/FAQ/khiếu nại/spam, che PII (F10) | `communityTypes.ts` | `GET /api/community` |
 
+### 9.2. Agent Intelligence Stack (chuẩn ngành 2026)
+
+Hệ thống hiện thực đủ bảy mối quan tâm lõi của agent stack hiện đại. Ngoài Orchestration và Governance (đã trình bày ở các mục trước), năm năng lực trí tuệ được bổ sung:
+
+| Mối quan tâm | Module | Vai trò | Endpoint |
+|---|---|---|---|
+| Models | `modelRouter.ts` | Định tuyến model theo agent: việc khó (Manager, Brand) dùng tier mạnh, việc nhẹ dùng tier rẻ; kiểm soát chi phí | — |
+| Knowledge (RAG) | `knowledgeBase.ts` | Retrieval từ vựng BM25-lite trên tri thức thương hiệu thật để agent bám dữ liệu, không bịa | — |
+| Eval | `agentEval.ts` | Bộ chấm độc lập (LLM-as-judge + heuristic); chặn claim phóng đại; cap điểm hiệu dụng trước cổng duyệt | — |
+| Observability | `telemetry.ts` | Span mỗi lượt agent: model, token/chi phí ước lượng, điểm eval, drift | `GET /api/telemetry` |
+| Memory | `campaignMemory.ts` | Ký ức dài hạn: chiến dịch đã đo lường trở thành bài học cho chiến dịch sau (nối Learning Package F12) | `GET /api/memory` |
+
+Tất cả chạy chế độ mock/heuristic khi chưa có API key và tự bật chế độ thật khi cắm `NINE_ROUTER_API_KEY`, không phải sửa mã.
+
 ## 10. Quy trình nghiệp vụ end-to-end
 
 ```mermaid
