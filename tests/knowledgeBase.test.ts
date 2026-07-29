@@ -2,11 +2,14 @@
 import { describe, expect, it } from "vitest";
 import { parseBrandKnowledgeBase } from "../src/domain/knowledgeTypes";
 import {
+  embedKnowledgeBase,
   formatKnowledgeForPrompt,
   loadBrandKnowledge,
   retrieveKnowledge,
+  retrieveKnowledgeSmart,
   sampleBrandKnowledge
 } from "../src/integrations/knowledgeBase";
+import { createEmbeddingConfig } from "../src/integrations/embeddingProvider";
 
 describe("retrieveKnowledge (RAG-lite)", () => {
   it("trả về chunk liên quan nhất theo truy vấn", () => {
@@ -38,6 +41,33 @@ describe("formatKnowledgeForPrompt", () => {
     const block = formatKnowledgeForPrompt(retrieveKnowledge(sampleBrandKnowledge, "giá setup", 1));
     expect(block).toContain("CĂN CỨ THƯƠNG HIỆU");
     expect(block).toContain("4.900.000");
+  });
+});
+
+describe("retrieveKnowledgeSmart (hybrid dense + BM25)", () => {
+  // Embedding giả theo từ khóa để test xác định.
+  const fakeEmbed = (async (_url: string, init?: RequestInit) => {
+    const body = JSON.parse((init?.body as string) ?? "{}") as { input: string[] };
+    const data = body.input.map((text) => ({
+      embedding: [/giá/i.test(text) ? 1 : 0, /vat/i.test(text) ? 1 : 0, /triển/i.test(text) ? 1 : 0]
+    }));
+    return new Response(JSON.stringify({ data }), { status: 200 });
+  }) as unknown as typeof fetch;
+
+  it("fallback BM25 khi embedding tắt", async () => {
+    const config = createEmbeddingConfig({});
+    const embeddings = await embedKnowledgeBase(sampleBrandKnowledge, config);
+    expect(embeddings.every((vector) => vector === undefined)).toBe(true);
+    const hits = await retrieveKnowledgeSmart(sampleBrandKnowledge, "giá gói setup SME", { config, embeddings });
+    expect(hits[0].chunk.id).toBe("pricing-setup-sme");
+  });
+
+  it("dùng hybrid khi có embedding (tìm đúng chính sách VAT)", async () => {
+    const config = createEmbeddingConfig({ EMBEDDING_API_KEY: "k" });
+    const embeddings = await embedKnowledgeBase(sampleBrandKnowledge, config, fakeEmbed);
+    expect(embeddings.some((vector) => vector && vector.length > 0)).toBe(true);
+    const hits = await retrieveKnowledgeSmart(sampleBrandKnowledge, "hóa đơn vat", { config, embeddings, fetchImpl: fakeEmbed });
+    expect(hits.map((hit) => hit.chunk.id)).toContain("policy-vat");
   });
 });
 

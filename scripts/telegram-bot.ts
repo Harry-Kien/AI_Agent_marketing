@@ -8,7 +8,8 @@ import {
 } from "../src/integrations/aiProvider";
 import { resolveModelRouting } from "../src/integrations/modelRouter";
 import { evaluateAgentOutput } from "../src/integrations/agentEval";
-import { formatKnowledgeForPrompt, loadBrandKnowledge, retrieveKnowledge } from "../src/integrations/knowledgeBase";
+import { embedKnowledgeBase, formatKnowledgeForPrompt, loadBrandKnowledge, retrieveKnowledgeSmart } from "../src/integrations/knowledgeBase";
+import { createEmbeddingConfig } from "../src/integrations/embeddingProvider";
 import {
   approveRunAndPreparePublication,
   completePublication,
@@ -112,6 +113,19 @@ function brandKnowledge() {
     );
   }
   return cachedKnowledge;
+}
+
+let cachedEmbedConfig: ReturnType<typeof createEmbeddingConfig> | null = null;
+function embedConfig() {
+  if (!cachedEmbedConfig) cachedEmbedConfig = createEmbeddingConfig(process.env);
+  return cachedEmbedConfig;
+}
+
+// Nhúng knowledge base một lần (hybrid retrieval); embedding tắt thì fallback BM25.
+let cachedKbEmbeddings: Array<number[] | undefined> | null = null;
+async function knowledgeEmbeddings() {
+  if (!cachedKbEmbeddings) cachedKbEmbeddings = await embedKnowledgeBase(brandKnowledge(), embedConfig());
+  return cachedKbEmbeddings;
 }
 
 const roleUpdatePrefixes: Record<MarketingBotRole, number> = {
@@ -372,7 +386,11 @@ async function runWorkflowStage(
   // Intelligence stack: định tuyến model theo vai trò + RAG grounding từ tri thức thương hiệu.
   const routing = resolveModelRouting(run.role, process.env);
   let stageContext = run.input;
-  const knowledgeHits = retrieveKnowledge(brandKnowledge(), `${campaign.brief} ${run.stage}`, 3);
+  const knowledgeHits = await retrieveKnowledgeSmart(brandKnowledge(), `${campaign.brief} ${run.stage}`, {
+    config: embedConfig(),
+    embeddings: await knowledgeEmbeddings(),
+    k: 3
+  });
   const grounding = formatKnowledgeForPrompt(knowledgeHits);
   if (grounding) stageContext = `${grounding}\n\n${stageContext}`;
 

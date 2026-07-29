@@ -19,7 +19,8 @@ import {
 import { createMetaGraphClient, createMetaGraphConfig } from "../src/integrations/metaGraphAdapter";
 import { loadAppConfig } from "../src/config/appConfig";
 import { createLogger } from "../src/lib/logger";
-import { loadBrandKnowledge } from "../src/integrations/knowledgeBase";
+import { embedKnowledgeBase, loadBrandKnowledge } from "../src/integrations/knowledgeBase";
+import { createEmbeddingConfig } from "../src/integrations/embeddingProvider";
 import { createTraceCollector } from "../src/integrations/telemetry";
 import { appendCampaignMemory, buildCampaignMemory, loadCampaignMemories } from "../src/integrations/campaignMemory";
 import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "../src/integrations/campaignAnalytics";
@@ -39,7 +40,15 @@ let snapshot = (await loadRuntimeSnapshot(statePath, () => createRuntimeSnapshot
 let fingerprint = JSON.stringify(snapshot.workflow);
 
 const brandKnowledge = loadBrandKnowledge(process.env.BRAND_KNOWLEDGE_PATH ? resolve(process.env.BRAND_KNOWLEDGE_PATH) : undefined);
-log.info("Brand knowledge base đã nạp", { name: brandKnowledge.name, chunks: brandKnowledge.chunks.length });
+const embedConfig = createEmbeddingConfig(process.env);
+// Nhúng knowledge base MỘT LẦN lúc khởi động (hybrid retrieval); embedding tắt thì fallback BM25.
+const knowledgeEmbeddings = await embedKnowledgeBase(brandKnowledge, embedConfig);
+const semanticOn = knowledgeEmbeddings.some((vector) => vector && vector.length > 0);
+log.info("Brand knowledge base đã nạp", {
+  name: brandKnowledge.name,
+  chunks: brandKnowledge.chunks.length,
+  retrieval: semanticOn ? "hybrid (dense + BM25)" : "BM25 (chưa cắm embedding)"
+});
 
 const traces = createTraceCollector(200);
 const memoryPath = resolve(dirname(statePath), "campaign-memory.json");
@@ -50,6 +59,8 @@ const orchestratorContext = (): OrchestratorContext => ({
   ai: createAiProviderConfig(process.env),
   policy: createApprovalPolicyConfig(process.env),
   knowledge: brandKnowledge,
+  knowledgeEmbeddings,
+  embedConfig,
   memories,
   onSpan: (span) => traces.record(span),
   env: process.env

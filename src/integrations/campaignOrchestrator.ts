@@ -19,8 +19,9 @@ import {
 import { evaluateApprovalPolicy, type ApprovalPolicyConfig } from "./approvalPolicy";
 import { applyApprovalPolicyDecision } from "./workflowApproval";
 import { resolveModelRouting } from "./modelRouter";
-import { formatKnowledgeForPrompt, retrieveKnowledge } from "./knowledgeBase";
+import { formatKnowledgeForPrompt, retrieveKnowledge, retrieveKnowledgeSmart } from "./knowledgeBase";
 import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
+import type { EmbeddingConfig } from "./embeddingProvider";
 import { evaluateAgentOutput } from "./agentEval";
 import { estimateCostUsd, estimateTokens, type AgentSpan } from "./telemetry";
 import { formatMemoriesForPrompt, retrieveMemories } from "./campaignMemory";
@@ -39,6 +40,8 @@ export interface OrchestratorContext {
   ai: AiProviderConfig;
   policy: ApprovalPolicyConfig;
   knowledge?: BrandKnowledgeBase;
+  knowledgeEmbeddings?: Array<number[] | undefined>;
+  embedConfig?: EmbeddingConfig;
   memories?: CampaignMemory[];
   onSpan?: (span: AgentSpan) => void;
   env?: Record<string, string | undefined>;
@@ -78,7 +81,14 @@ async function advanceFromRunningStage(
     // RAG: nạp căn cứ thương hiệu liên quan để agent bám dữ liệu thật thay vì bịa.
     let context = run.input;
     if (ctx.knowledge) {
-      const hits = retrieveKnowledge(ctx.knowledge, `${campaign.brief} ${run.stage}`, 3);
+      const query = `${campaign.brief} ${run.stage}`;
+      const hits = ctx.embedConfig
+        ? await retrieveKnowledgeSmart(ctx.knowledge, query, {
+            config: ctx.embedConfig,
+            embeddings: ctx.knowledgeEmbeddings,
+            k: 3
+          })
+        : retrieveKnowledge(ctx.knowledge, query, 3);
       const grounding = formatKnowledgeForPrompt(hits);
       if (grounding) context = `${grounding}\n\n${context}`;
     }

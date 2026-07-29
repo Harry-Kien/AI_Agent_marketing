@@ -5,6 +5,10 @@ import {
   type KnowledgeChunk,
   type KnowledgeHit
 } from "../domain/knowledgeTypes";
+import { embedOne, embedTexts, type EmbeddingConfig } from "./embeddingProvider";
+import { hybridRetrieve } from "./semanticRetrieval";
+
+type FetchLike = typeof fetch;
 
 // Tách token, giữ chữ có dấu tiếng Việt (\p{L}) và số (\p{N}).
 function tokenize(text: string): string[] {
@@ -40,6 +44,39 @@ export function retrieveKnowledge(kb: BrandKnowledgeBase, query: string, k = 3):
     .filter((hit) => hit.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
+}
+
+function chunkText(chunk: KnowledgeChunk): string {
+  return `${chunk.title} ${chunk.content} ${chunk.tags.join(" ")}`;
+}
+
+// Nhúng toàn bộ chunk MỘT LẦN (cache lúc khởi động). Trả undefined[] nếu embedding tắt → fallback BM25.
+export async function embedKnowledgeBase(
+  kb: BrandKnowledgeBase,
+  config: EmbeddingConfig,
+  fetchImpl: FetchLike = fetch
+): Promise<Array<number[] | undefined>> {
+  const vectors = await embedTexts(config, kb.chunks.map(chunkText), fetchImpl);
+  return vectors ?? kb.chunks.map(() => undefined);
+}
+
+// Retrieval "thông minh": hybrid (dense + BM25) khi có embedding; suy biến BM25 khi chưa cắm key.
+export async function retrieveKnowledgeSmart(
+  kb: BrandKnowledgeBase,
+  query: string,
+  options: { config: EmbeddingConfig; embeddings?: Array<number[] | undefined>; k?: number; fetchImpl?: FetchLike }
+): Promise<KnowledgeHit[]> {
+  const k = options.k ?? 3;
+  const hasEmbeddings = Boolean(options.embeddings?.some((vector) => vector && vector.length > 0));
+  const queryEmbedding = hasEmbeddings ? await embedOne(options.config, query, options.fetchImpl ?? fetch) : null;
+  const docs = kb.chunks.map((chunk, index) => ({
+    text: chunkText(chunk),
+    embedding: options.embeddings?.[index]
+  }));
+  return hybridRetrieve(docs, query, queryEmbedding, k).map((hit) => ({
+    chunk: kb.chunks[hit.index],
+    score: hit.score
+  }));
 }
 
 // Định dạng tri thức thành khối căn cứ để chèn vào prompt của agent.
