@@ -22,7 +22,7 @@ import { createLogger } from "../src/lib/logger";
 import { embedKnowledgeBase, loadBrandKnowledge } from "../src/integrations/knowledgeBase";
 import { createEmbeddingConfig } from "../src/integrations/embeddingProvider";
 import { createTraceCollector } from "../src/integrations/telemetry";
-import { appendCampaignMemory, buildCampaignMemory, loadCampaignMemories } from "../src/integrations/campaignMemory";
+import { appendCampaignMemory, buildCampaignMemory, embedMemories, loadCampaignMemories } from "../src/integrations/campaignMemory";
 import { buildAnalyticsReadModel, sampleKpiTarget, sampleMetricSnapshot } from "../src/integrations/campaignAnalytics";
 
 const envPath = resolve(process.cwd(), ".env");
@@ -53,6 +53,7 @@ log.info("Brand knowledge base đã nạp", {
 const traces = createTraceCollector(200);
 const memoryPath = resolve(dirname(statePath), "campaign-memory.json");
 let memories = loadCampaignMemories(memoryPath);
+let memoryEmbeddings = await embedMemories(memories, embedConfig);
 log.info("Ký ức chiến dịch đã nạp", { count: memories.length });
 
 const orchestratorContext = (): OrchestratorContext => ({
@@ -62,6 +63,7 @@ const orchestratorContext = (): OrchestratorContext => ({
   knowledgeEmbeddings,
   embedConfig,
   memories,
+  memoryEmbeddings,
   onSpan: (span) => traces.record(span),
   env: process.env
 });
@@ -141,6 +143,7 @@ const api = createControlApi({
         if (campaign?.stage === "published") {
           const analytics = buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget });
           memories = appendCampaignMemory(memoryPath, buildCampaignMemory({ campaignId: campaign.id, brief: campaign.brief, analytics }));
+          memoryEmbeddings = await embedMemories(memories, embedConfig);
           log.info("Đã ghi ký ức chiến dịch", { campaignId: campaign.id, total: memories.length });
         }
       })

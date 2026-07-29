@@ -6,11 +6,18 @@ import {
   type CampaignMemoryHit
 } from "../domain/memoryTypes";
 import type { AnalyticsReadModel } from "../domain/analyticsTypes";
+import { embedOne, embedTexts, type EmbeddingConfig } from "./embeddingProvider";
+import { hybridRetrieve } from "./semanticRetrieval";
 
+type FetchLike = typeof fetch;
 const nowIso = () => new Date().toISOString();
 
 function tokenize(text: string): string[] {
   return text.toLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
+}
+
+function memoryText(memory: CampaignMemory): string {
+  return `${memory.brief} ${memory.lessons.join(" ")} ${memory.tags.join(" ")}`;
 }
 
 const stopwords = new Set(["chiến", "dịch", "cho", "và", "của", "một", "các", "trong", "với", "để", "là", "có"]);
@@ -74,6 +81,29 @@ export function retrieveMemories(memories: CampaignMemory[], query: string, k = 
     .filter((hit) => hit.score > 0)
     .sort((a, b) => b.score - a.score)
     .slice(0, k);
+}
+
+// Nhúng toàn bộ ký ức một lần (hybrid recall); embedding tắt → undefined[] → fallback BM25.
+export async function embedMemories(
+  memories: CampaignMemory[],
+  config: EmbeddingConfig,
+  fetchImpl: FetchLike = fetch
+): Promise<Array<number[] | undefined>> {
+  const vectors = await embedTexts(config, memories.map(memoryText), fetchImpl);
+  return vectors ?? memories.map(() => undefined);
+}
+
+// Recall "thông minh": hybrid (dense + BM25) khi có embedding; suy biến BM25 khi chưa cắm key.
+export async function retrieveMemoriesSmart(
+  memories: CampaignMemory[],
+  query: string,
+  options: { config: EmbeddingConfig; embeddings?: Array<number[] | undefined>; k?: number; fetchImpl?: FetchLike }
+): Promise<CampaignMemoryHit[]> {
+  const k = options.k ?? 2;
+  const hasEmbeddings = Boolean(options.embeddings?.some((vector) => vector && vector.length > 0));
+  const queryEmbedding = hasEmbeddings ? await embedOne(options.config, query, options.fetchImpl ?? fetch) : null;
+  const docs = memories.map((memory, index) => ({ text: memoryText(memory), embedding: options.embeddings?.[index] }));
+  return hybridRetrieve(docs, query, queryEmbedding, k).map((hit) => ({ memory: memories[hit.index], score: hit.score }));
 }
 
 export function formatMemoriesForPrompt(hits: CampaignMemoryHit[]): string {

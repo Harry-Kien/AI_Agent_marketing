@@ -24,7 +24,7 @@ import type { BrandKnowledgeBase } from "../domain/knowledgeTypes";
 import type { EmbeddingConfig } from "./embeddingProvider";
 import { evaluateAgentOutput } from "./agentEval";
 import { estimateCostUsd, estimateTokens, type AgentSpan } from "./telemetry";
-import { formatMemoriesForPrompt, retrieveMemories } from "./campaignMemory";
+import { formatMemoriesForPrompt, retrieveMemories, retrieveMemoriesSmart } from "./campaignMemory";
 import type { CampaignMemory } from "../domain/memoryTypes";
 
 // Ánh xạ stage -> lệnh gửi cho agent, khớp đúng telegram-bot.
@@ -43,6 +43,7 @@ export interface OrchestratorContext {
   knowledgeEmbeddings?: Array<number[] | undefined>;
   embedConfig?: EmbeddingConfig;
   memories?: CampaignMemory[];
+  memoryEmbeddings?: Array<number[] | undefined>;
   onSpan?: (span: AgentSpan) => void;
   env?: Record<string, string | undefined>;
   now?: () => string;
@@ -94,7 +95,13 @@ async function advanceFromRunningStage(
     }
     // Memory: giai đoạn nghiên cứu học từ chiến dịch trước (chuẩn "memory" 2026).
     if (run.stage === "research" && ctx.memories?.length) {
-      const memoryHits = retrieveMemories(ctx.memories, campaign.brief, 2);
+      const memoryHits = ctx.embedConfig
+        ? await retrieveMemoriesSmart(ctx.memories, campaign.brief, {
+            config: ctx.embedConfig,
+            embeddings: ctx.memoryEmbeddings,
+            k: 2
+          })
+        : retrieveMemories(ctx.memories, campaign.brief, 2);
       const recall = formatMemoriesForPrompt(memoryHits);
       if (recall) context = `${recall}\n\n${context}`;
     }

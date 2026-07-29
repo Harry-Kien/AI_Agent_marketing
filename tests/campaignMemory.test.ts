@@ -8,10 +8,13 @@ import {
   appendCampaignMemory,
   buildCampaignMemory,
   buildMemoryReadModel,
+  embedMemories,
   formatMemoriesForPrompt,
   loadCampaignMemories,
-  retrieveMemories
+  retrieveMemories,
+  retrieveMemoriesSmart
 } from "../src/integrations/campaignMemory";
+import { createEmbeddingConfig } from "../src/integrations/embeddingProvider";
 
 const fixedNow = () => "2026-07-22T10:00:00.000Z";
 const analytics = buildAnalyticsReadModel({ actual: sampleMetricSnapshot, target: sampleKpiTarget, now: fixedNow });
@@ -58,6 +61,33 @@ describe("store bền qua phiên", () => {
 
   it("load rỗng khi chưa có file", () => {
     expect(loadCampaignMemories("/khong/ton/tai.json")).toHaveLength(0);
+  });
+});
+
+describe("retrieveMemoriesSmart (hybrid)", () => {
+  const fakeEmbed = (async (_url: string, init?: RequestInit) => {
+    const body = JSON.parse((init?.body as string) ?? "{}") as { input: string[] };
+    const data = body.input.map((text) => ({
+      embedding: [/kế toán/i.test(text) ? 1 : 0, /mỹ phẩm/i.test(text) ? 1 : 0]
+    }));
+    return new Response(JSON.stringify({ data }), { status: 200 });
+  }) as unknown as typeof fetch;
+
+  it("fallback BM25 khi embedding tắt", async () => {
+    const memories = [memoryFor("CMP-A", "phần mềm kế toán AI"), memoryFor("CMP-B", "mỹ phẩm thiên nhiên")];
+    const config = createEmbeddingConfig({});
+    const embeddings = await embedMemories(memories, config);
+    const hits = await retrieveMemoriesSmart(memories, "kế toán doanh nghiệp", { config, embeddings });
+    expect(hits[0].memory.campaignId).toBe("CMP-A");
+  });
+
+  it("hybrid khi có embedding", async () => {
+    const memories = [memoryFor("CMP-A", "phần mềm kế toán AI"), memoryFor("CMP-B", "mỹ phẩm thiên nhiên")];
+    const config = createEmbeddingConfig({ EMBEDDING_API_KEY: "k" });
+    const embeddings = await embedMemories(memories, config, fakeEmbed);
+    expect(embeddings.some((vector) => vector && vector.length > 0)).toBe(true);
+    const hits = await retrieveMemoriesSmart(memories, "phần mềm kế toán", { config, embeddings, fetchImpl: fakeEmbed });
+    expect(hits[0].memory.campaignId).toBe("CMP-A");
   });
 });
 
