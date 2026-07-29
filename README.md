@@ -165,6 +165,8 @@ npm run audit:system
 git diff --check
 ```
 
+**Quy trình nghiệm thu đầy đủ** (3 mức: test tự động → dashboard thật → live với key), có lệnh copy-paste + kết quả kỳ vọng + checklist: `docs/operations/QUY_TRINH_KIEM_THU.md`.
+
 ## Thư mục chính
 
 ```text
